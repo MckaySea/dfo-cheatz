@@ -24612,3 +24612,445 @@ index f72020f0ce..dd65c7bfbe 100644
 warning: in the working copy of 'src/devtools/overlay/tap.js', LF will be replaced by CRLF the next time Git touches it
 [2026-11-04T04:36:31.954Z] Build is current.
 [2026-11-04T04:36:31.976Z] DFO Overlay is starting. Press Insert in game for the overlay.
+[2026-11-04T04:37:24.295Z] ── DFO Overlay 11/3/2026, 8:37:24 PM ──
+overlay-dev
+ M src/devtools/overlay/index.js
+ M src/devtools/overlay/tap.js
+ M src/devtools/overlay/vite.overlay.config.js
+src/devtools/overlay/dropRule.js
+src/devtools/overlay/itemMint.js
+src/devtools/overlay/panels/lootedit.js
+src/devtools/overlay/panels/spawn.js
+[2026-11-04T04:37:25.738Z] !! There are uncommitted overlay edits - building them as they are; updating waits until they are committed.
+ M src/devtools/overlay/index.js
+ M src/devtools/overlay/tap.js
+ M src/devtools/overlay/vite.overlay.config.js
+src/devtools/overlay/dropRule.js
+src/devtools/overlay/itemMint.js
+src/devtools/overlay/panels/lootedit.js
+src/devtools/overlay/panels/spawn.js
+e87a0091a051aaf78de46f020737a6ef43608921
+diff --git a/src/devtools/overlay/index.js b/src/devtools/overlay/index.js
+index 1d51a32fde..f078471dc5 100644
+--- a/src/devtools/overlay/index.js
++++ b/src/devtools/overlay/index.js
+@@ -47,6 +47,9 @@ import { standingPanel } from './panels/standing.js';
+ import { caravanPanel } from './panels/caravan.js';
+ import { playersPanel } from './panels/players.js';
+ import { servicesPanel } from './panels/services.js';
++import { spawnPanel } from './panels/spawn.js';
++import { lootEditPanel } from './panels/lootedit.js';
++import { installDropRule } from './dropRule.js';
+ import { eventsPanel } from './panels/events.js';
+ import { presetLayout } from './presets.js';
+ import { createWelcome } from './welcome.js';
+@@ -61,6 +64,7 @@ const GROUPS = [
+   ['Journal', ['quests', 'questpath', 'lootlog', 'pack', 'events']],
+   ['Loot & trade', ['loot', 'lootfilter', 'sell']],
+   ['World', ['town', 'travel', 'caravan', 'players', 'services', 'nodes']],
++  ['Admin', ['spawn', 'lootedit']],
+   ['Overlay', ['glance', 'alerts', ...HOSTS, 'layouts', 'settings']],
+ ];
+ 
+@@ -118,10 +122,11 @@ export function bootOverlay() {
+   installAlerts();           // alerts watch with their panel closed
+   installGearKeys();         // gear hotkeys work with the panel closed; installed before the toggle key so a bind in progress takes every key
+   installQuestPath();        // the path draws and follows you with its panel closed
++  installDropRule();         // the drop rule lays its pieces on every foe rolled, panel open or not
+   const sell = sellPanel(wm);   // its watch rides the loop: the game's Sell window brings it up
+   const preset = (name) => { const L = presetLayout(name); if (L) wm.applyLayout(L); };
+   const welcome = createWelcome(root, preset);
+-  for (const make of [glancePanel, gearPanel, combatPanel, spellsPanel, lootPanel, buffsPanel, nodesPanel, townMapPanel, travelPanel, sessionPanel, lootLogPanel, lootFilterPanel, skillsPanel, packPanel, alertsPanel, inspectPanel, questsPanel, questPathPanel, standingPanel, caravanPanel, playersPanel, servicesPanel, eventsPanel, () => sell, () => layoutsPanel(wm),
++  for (const make of [glancePanel, gearPanel, combatPanel, spellsPanel, lootPanel, buffsPanel, nodesPanel, townMapPanel, travelPanel, sessionPanel, lootLogPanel, lootFilterPanel, skillsPanel, packPanel, alertsPanel, inspectPanel, questsPanel, questPathPanel, standingPanel, caravanPanel, playersPanel, servicesPanel, eventsPanel, spawnPanel, lootEditPanel, () => sell, () => layoutsPanel(wm),
+     () => settingsPanel(wm, { welcome: () => welcome.show(), starter: () => preset('Starter') })]) {
+     try { wm.add(make()); } catch (e) { console.warn('[overlay] a panel failed to mount', e); }
+   }
+diff --git a/src/devtools/overlay/tap.js b/src/devtools/overlay/tap.js
+index a01f9fb281..e1302c9ffa 100644
+--- a/src/devtools/overlay/tap.js
++++ b/src/devtools/overlay/tap.js
+@@ -47,3 +47,15 @@ export const freeTrain = { on: false };
+ // The world frame's draw door (vite.overlay.config.js WORLD_EDITS): called with the renderer in the veiled slot, after
+ // the opaque world, every frame. The quest path sets it
+ export const drawHook = { fn: null };
++
++// The crosshair's frame (ui/worldPlaque.js worldHoverFrame, vite.overlay.config.js PLAQUE_EDITS): what the plaque names
++// under the crosshair this frame - its key, its rows - and the host's own contents reader (the live list a key names),
++// for the Loot editor. Set every frame the plaque resolves; a frame older than a few hundred ms is gone
++export const hover = {
++  frame: null, contents: null, at: 0,
++  set(frame, contents) { this.frame = frame ?? null; this.contents = typeof contents === 'function' ? contents : null; this.at = performance.now(); },
++};
++
++// The drop rule's door (scenes/hostCombat.js spawnEnemyLoot's tail, vite.overlay.config.js DROP_EDITS): called with every
++// foe whose loot this client rolled, after its cap - (entity, mobileType, basics, where). dropRule.js sets it
++export const dropHook = { fn: null };
+diff --git a/src/devtools/overlay/vite.overlay.config.js b/src/devtools/overlay/vite.overlay.config.js
+index f72020f0ce..dd65c7bfbe 100644
+--- a/src/devtools/overlay/vite.overlay.config.js
++++ b/src/devtools/overlay/vite.overlay.config.js
+@@ -35,6 +35,15 @@ const MAIN_HOOK = "import('./devtools/overlay/index.js').then((m) => m.bootOverl
+ //              while anything else moves the player.
+ //   raiseSkillsNow  the skill check a rest's end and a trip's arrival run (raisePlayerSkills, the same boxes), run now.
+ //              Its own wait still holds unless the Services panel's noSkillWait is on.
++//   spawnNpc   ADMIN TEST SERVER (panels/spawn.js): a foe stood in front of the player through DFU's own placement law
++//              (hostEnchant.js standLooseFoe, as _standLooseFoe stands a summoning's squad) in the pool of the mode -
++//              the street's (exteriorFoes.spawnFoe: a loose, transient stand under the grant kind asked), a building's
++//              (the modes hook's dfoStandInside), the dungeon's (dungeonCtx.spawnLooseFoe) - with its level, gender,
++//              elite and side. Answers the record, or { why } (busy, mode, spot).
++//   npcPool    the mode's own pool (mine and other players' puppets); npcKill a blow of mine on one of mine; npcRemove
++//              one of mine gone with no body; bodyOf the pool's record a body key names (a puppet's: theirs).
++//   settlePile a dungeon pile's flat after its list was edited (DUNGEON_EDITS __dfoSettlePile: an emptied bag goes).
++//   openList   the game's own loot window over a list the caller owns (legacyOpenRemains' shape), any mode.
+ // The quest path's reads (questPath.js): the feet, the dungeon's navmesh, the collider and doors a mesh is baked from,
+ // the room's identity, a point on screen, and the way in (the dungeon's start marker, a building's entrance).
+ // No `//` inside the hook: it is laid on one line.
+@@ -136,6 +145,63 @@ const WORLD_HOOK = `import('../devtools/overlay/tap.js').then((m) => m.tapWorld(
+       hudFade.fadeHUDFromBlack();
+     }
+   },
++  spawnNpc: (type, o) => {
++    o = o || {};
++    if (townTalk.overlayActive || !playerSpawned) return Promise.resolve({ why: 'busy' });
++    const mode = modes?.mode ?? 'exterior';
++    const extra = { level: Number.isFinite(o.level) ? o.level : null, gender: o.gender ?? null, eliteFoe: o.elite == null ? undefined : !!o.elite };
++    const place = { allied: !!o.allied, minDistance: Number.isFinite(o.near) ? o.near : 4, maxDistance: Number.isFinite(o.far) ? o.far : 20 };
++    if (mode === 'interior') return Promise.resolve(modes?.dfoStandInside?.(type, o, extra, place) ?? null).then((f) => f ?? { why: 'spot' });
++    if (mode !== 'exterior' && mode !== 'dungeon') return Promise.resolve({ why: 'mode' });
++    const d = _dungeonPool();
++    return Promise.resolve(standLooseFoe({
++      collider: d ? d.collider : collider, feet: enchantFeet(), yawRad: cam.yaw, fovDegrees: fieldOfView() * 180 / Math.PI, foes: enchantFoes(),
++      spawn: (mt, pos, s) => (d
++        ? d.spawnLooseFoe(mt, pos, { yawRad: s.yawRad, allied: s.allied, level: extra.level, gender: extra.gender, eliteFoe: !!extra.eliteFoe })
++        : exteriorFoes.spawnFoe(mt, pos, { yaw: s.yawRad, allied: s.allied, loose: true, transient: true, grantKind: o.grantKind ?? null, level: extra.level, gender: extra.gender, eliteFoe: extra.eliteFoe })),
++    }, type, place)).then((f) => f ?? { why: 'spot' });
++  },
++  npcPool: () => {
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return modes?.dungeonCtx?.foes ?? [];
++    if (mode === 'interior') return modes?.insideFoes?.() ?? [];
++    return [...exteriorFoes.foes, ...cityGuards.guards];
++  },
++  npcKill: (f) => {
++    if (!f || f.dead || f.puppet) return false;
++    const mode = modes?.mode ?? 'exterior', hp = (f.entity?.health ?? 0) + 1;
++    if (mode === 'dungeon') { modes?.dungeonCtx?.damageFoe?.(f, hp, enchantFeet(), null, { fromPlayer: true, bypassShield: true }); return true; }
++    if (mode === 'interior') return !!modes?.dfoKillInside?.(f);
++    if (!exteriorFoes.foes.includes(f)) return false;
++    exteriorFoes.damageFoe(f, hp, enchantFeet(), null, { fromPlayer: true, bypassShield: true });
++    return true;
++  },
++  npcRemove: (f) => {
++    if (!f || f.puppet) return false;
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return !!modes?.dungeonCtx?.removeLooseFoe?.(f);
++    if (mode === 'interior') return !!modes?.dfoRemoveInside?.(f);
++    if (!exteriorFoes.foes.includes(f)) return false;
++    exteriorFoes.removeFoe(f);
++    return true;
++  },
++  bodyOf: (key) => {
++    if (typeof key !== 'string') return null;
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return key.startsWith('corpse:') ? modes?.dungeonCtx?.foes?.[Number(key.slice(7))] ?? null : null;
++    if (mode === 'interior') return modes?.dfoBodyOf?.(key) ?? null;
++    return key.startsWith('foeCorpse:') ? exteriorFoes.foes.find((f) => exteriorFoes.corpseKeyOf(f) === key) ?? null : null;
++  },
++  settlePile: (key) => { if (typeof key === 'string' && key.startsWith('loot:') && (modes?.mode ?? 'exterior') === 'dungeon') modes?.dungeonCtx?.__dfoSettlePile?.(Number(key.slice(5))); },
++  openList: (items, name) => {
++    if (townTalk.overlayActive && !townTalk.overlayDone) return false;
++    const hooks = { items: () => items, playerOwned: false, title: name, containerImage: () => CONTAINER_IMAGES.Chest, pos: [...enchantFeet()] };
++    const mode = modes?.mode ?? 'exterior';
++    if (mode !== 'exterior') return !!modes?.openLootList?.(items, hooks);
++    const w = makeInventoryWindow({ loot: hooks });
++    if (w) townTalk.showOverlay(w);
++    return !!w;
++  },
+   raiseSkillsNow: () => {
+     if (townTalk.overlayActive || !(playerEntity.health > 0)) return { why: 'busy' };
+     const was = playerEntity.lastSkillCheckTime;
+@@ -215,6 +281,20 @@ const MODES_HOOK = `import('../devtools/overlay/tap.js').then((m) => m.tapModes(
+     surfacePlayer();
+     return { why: 'ok', tally: r.tally, price };
+   },
++  dfoStandInside: (type, o, extra, place) => {
++    if (!interiorCtx || !interiorFoes) return null;
++    return standLooseFoe({
++      collider: interiorCtx.collider, feet: player.pos, yawRad: cam.yaw, fovDegrees: fieldOfView() * 180 / Math.PI, foes: interiorFoePool(),
++      spawn: (mt, pos, s) => interiorFoes.spawnFoe(mt, pos, { yaw: s.yawRad, allied: s.allied, loose: true, transient: true, grantKind: o?.grantKind ?? null, level: extra?.level ?? null, gender: extra?.gender ?? null, eliteFoe: extra?.eliteFoe }),
++    }, type, place ?? {});
++  },
++  dfoKillInside: (f) => {
++    if (!interiorFoes || !f || f.dead || f.puppet || !interiorFoes.foes.includes(f)) return false;
++    interiorFoes.damageFoe(f, (f.entity?.health ?? 0) + 1, player.pos, null, { fromPlayer: true, bypassShield: true });
++    return true;
++  },
++  dfoRemoveInside: (f) => { if (!interiorFoes || !f || f.puppet || !interiorFoes.foes.includes(f)) return false; interiorFoes.removeFoe(f); return true; },
++  dfoBodyOf: (key) => (typeof key === 'string' && key.startsWith('foeCorpse:') ? interiorFoes?.foes?.find((f) => interiorFoes.corpseKeyOf(f) === key) ?? null : null),
+   questMarksIn: (where, followedId) => {
+     if (where === 'dungeon') return dungeonCtx ? dungeonQuestMarks({
+       stands: dungeonQuestFlats, foes: dungeonCtx.foes ?? [], boxOf: questStandBox, followedId,
+@@ -361,6 +441,23 @@ const QL_EDITS = [
+   ['the take-all', '  if (isJunk(item)) return true;', '  if (isJunk(item) || __dfoLoot.leaves(item, __dfoLootReads)) return true;'],
+ ];
+ const QL_FOOT = "const __dfoLootReads = { material: __dfoMat, rank: rarityRank, ammo: isAmmunition, name: (it) => __dfoName(it).name };";
++// scenes/hostCombat.js spawnEnemyLoot's tail: the drop rule's door (dropRule.js, tap.js dropHook) - called with every foe
++// this client rolled loot for, after its cap, so the rule's pieces are laid last and the cap it lifts is already read
++const DROP_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const DROP_EDITS = [
++  ['the drop rule', '  capFoeLoot(entity);', "  capFoeLoot(entity); try { __dfoTap.dropHook.fn?.(entity, mobileType, basics, where); } catch (e) { console.warn('[overlay] drop rule', e); }"],
++];
++// ui/worldPlaque.js worldHoverFrame: the frame the plaque resolved and the host's contents reader, kept for the Loot
++// editor (tap.js hover) - what the plaque names under the crosshair is what the editor edits
++const PLAQUE_IMPORT = "import * as __dfoTapP from '../devtools/overlay/tap.js';";
++const PLAQUE_EDITS = [
++  ['the crosshair frame', 'const frame = markBodyStack(resolveHover(hit, { name, contents }));', 'const frame = markBodyStack(resolveHover(hit, { name, contents })); __dfoTapP.hover.set(frame, contents);'],
++];
++// scenes/dungeonContext.js: a pile's flat settled after the Loot editor changed its list (settleLootFlat is the
++// context's own; the window's close calls it) - laid beside lootContents on the context's API
++const DUNGEON_EDITS = [
++  ['the pile settle', '    lootContents(key) {', '    __dfoSettlePile(i) { settleLootFlat(i); }, lootContents(key) {'],
++];
+ const editAll = (ctx, code, edits, file) => {
+   let out = code;
+   for (const [what, from, to] of edits) {
+@@ -423,6 +520,15 @@ function overlayHooks() {
+         if (!/import \{[^}]*\blocalListAccepts\b[^}]*\}/.test(code)) this.error('[dfo-overlay] the Sell helper\'s door needs localListAccepts imported in src/ui/enhanced/enhancedTrade.js');
+         return { code: `${code}\n${TRADE_FOOT}\n`, map: null };
+       }
++      if (fileIs(id, '/src/scenes/hostCombat.js')) {
++        return { code: `${DROP_IMPORT} ${editAll(this, code, DROP_EDITS, 'src/scenes/hostCombat.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/ui/worldPlaque.js')) {
++        return { code: `${PLAQUE_IMPORT} ${editAll(this, code, PLAQUE_EDITS, 'src/ui/worldPlaque.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/scenes/dungeonContext.js')) {
++        return { code: editAll(this, code, DUNGEON_EDITS, 'src/scenes/dungeonContext.js'), map: null };
++      }
+       if (fileIs(id, '/src/systems/worldHover.js')) {
+         return { code: `${HOVER_IMPORT} ${editAll(this, code, HOVER_EDITS, 'src/systems/worldHover.js')}\n${HOVER_FOOT}\n`, map: null };
+       }
+warning: in the working copy of 'src/devtools/overlay/tap.js', LF will be replaced by CRLF the next time Git touches it
+[2026-11-04T04:37:29.541Z] Build is current.
+[2026-11-04T04:37:29.553Z] DFO Overlay is starting. Press Insert in game for the overlay.
+[2026-11-04T04:42:12.300Z] ── DFO Overlay 11/3/2026, 8:42:12 PM ──
+overlay-dev
+ M src/devtools/overlay/index.js
+ M src/devtools/overlay/tap.js
+ M src/devtools/overlay/vite.overlay.config.js
+src/devtools/overlay/dropRule.js
+src/devtools/overlay/itemMint.js
+src/devtools/overlay/panels/lootedit.js
+src/devtools/overlay/panels/spawn.js
+[2026-11-04T04:42:12.490Z] !! There are uncommitted overlay edits - building them as they are; updating waits until they are committed.
+ M src/devtools/overlay/index.js
+ M src/devtools/overlay/tap.js
+ M src/devtools/overlay/vite.overlay.config.js
+src/devtools/overlay/dropRule.js
+src/devtools/overlay/itemMint.js
+src/devtools/overlay/panels/lootedit.js
+src/devtools/overlay/panels/spawn.js
+e87a0091a051aaf78de46f020737a6ef43608921
+diff --git a/src/devtools/overlay/index.js b/src/devtools/overlay/index.js
+index 1d51a32fde..f078471dc5 100644
+--- a/src/devtools/overlay/index.js
++++ b/src/devtools/overlay/index.js
+@@ -47,6 +47,9 @@ import { standingPanel } from './panels/standing.js';
+ import { caravanPanel } from './panels/caravan.js';
+ import { playersPanel } from './panels/players.js';
+ import { servicesPanel } from './panels/services.js';
++import { spawnPanel } from './panels/spawn.js';
++import { lootEditPanel } from './panels/lootedit.js';
++import { installDropRule } from './dropRule.js';
+ import { eventsPanel } from './panels/events.js';
+ import { presetLayout } from './presets.js';
+ import { createWelcome } from './welcome.js';
+@@ -61,6 +64,7 @@ const GROUPS = [
+   ['Journal', ['quests', 'questpath', 'lootlog', 'pack', 'events']],
+   ['Loot & trade', ['loot', 'lootfilter', 'sell']],
+   ['World', ['town', 'travel', 'caravan', 'players', 'services', 'nodes']],
++  ['Admin', ['spawn', 'lootedit']],
+   ['Overlay', ['glance', 'alerts', ...HOSTS, 'layouts', 'settings']],
+ ];
+ 
+@@ -118,10 +122,11 @@ export function bootOverlay() {
+   installAlerts();           // alerts watch with their panel closed
+   installGearKeys();         // gear hotkeys work with the panel closed; installed before the toggle key so a bind in progress takes every key
+   installQuestPath();        // the path draws and follows you with its panel closed
++  installDropRule();         // the drop rule lays its pieces on every foe rolled, panel open or not
+   const sell = sellPanel(wm);   // its watch rides the loop: the game's Sell window brings it up
+   const preset = (name) => { const L = presetLayout(name); if (L) wm.applyLayout(L); };
+   const welcome = createWelcome(root, preset);
+-  for (const make of [glancePanel, gearPanel, combatPanel, spellsPanel, lootPanel, buffsPanel, nodesPanel, townMapPanel, travelPanel, sessionPanel, lootLogPanel, lootFilterPanel, skillsPanel, packPanel, alertsPanel, inspectPanel, questsPanel, questPathPanel, standingPanel, caravanPanel, playersPanel, servicesPanel, eventsPanel, () => sell, () => layoutsPanel(wm),
++  for (const make of [glancePanel, gearPanel, combatPanel, spellsPanel, lootPanel, buffsPanel, nodesPanel, townMapPanel, travelPanel, sessionPanel, lootLogPanel, lootFilterPanel, skillsPanel, packPanel, alertsPanel, inspectPanel, questsPanel, questPathPanel, standingPanel, caravanPanel, playersPanel, servicesPanel, eventsPanel, spawnPanel, lootEditPanel, () => sell, () => layoutsPanel(wm),
+     () => settingsPanel(wm, { welcome: () => welcome.show(), starter: () => preset('Starter') })]) {
+     try { wm.add(make()); } catch (e) { console.warn('[overlay] a panel failed to mount', e); }
+   }
+diff --git a/src/devtools/overlay/tap.js b/src/devtools/overlay/tap.js
+index a01f9fb281..e1302c9ffa 100644
+--- a/src/devtools/overlay/tap.js
++++ b/src/devtools/overlay/tap.js
+@@ -47,3 +47,15 @@ export const freeTrain = { on: false };
+ // The world frame's draw door (vite.overlay.config.js WORLD_EDITS): called with the renderer in the veiled slot, after
+ // the opaque world, every frame. The quest path sets it
+ export const drawHook = { fn: null };
++
++// The crosshair's frame (ui/worldPlaque.js worldHoverFrame, vite.overlay.config.js PLAQUE_EDITS): what the plaque names
++// under the crosshair this frame - its key, its rows - and the host's own contents reader (the live list a key names),
++// for the Loot editor. Set every frame the plaque resolves; a frame older than a few hundred ms is gone
++export const hover = {
++  frame: null, contents: null, at: 0,
++  set(frame, contents) { this.frame = frame ?? null; this.contents = typeof contents === 'function' ? contents : null; this.at = performance.now(); },
++};
++
++// The drop rule's door (scenes/hostCombat.js spawnEnemyLoot's tail, vite.overlay.config.js DROP_EDITS): called with every
++// foe whose loot this client rolled, after its cap - (entity, mobileType, basics, where). dropRule.js sets it
++export const dropHook = { fn: null };
+diff --git a/src/devtools/overlay/vite.overlay.config.js b/src/devtools/overlay/vite.overlay.config.js
+index f72020f0ce..dd65c7bfbe 100644
+--- a/src/devtools/overlay/vite.overlay.config.js
++++ b/src/devtools/overlay/vite.overlay.config.js
+@@ -35,6 +35,15 @@ const MAIN_HOOK = "import('./devtools/overlay/index.js').then((m) => m.bootOverl
+ //              while anything else moves the player.
+ //   raiseSkillsNow  the skill check a rest's end and a trip's arrival run (raisePlayerSkills, the same boxes), run now.
+ //              Its own wait still holds unless the Services panel's noSkillWait is on.
++//   spawnNpc   ADMIN TEST SERVER (panels/spawn.js): a foe stood in front of the player through DFU's own placement law
++//              (hostEnchant.js standLooseFoe, as _standLooseFoe stands a summoning's squad) in the pool of the mode -
++//              the street's (exteriorFoes.spawnFoe: a loose, transient stand under the grant kind asked), a building's
++//              (the modes hook's dfoStandInside), the dungeon's (dungeonCtx.spawnLooseFoe) - with its level, gender,
++//              elite and side. Answers the record, or { why } (busy, mode, spot).
++//   npcPool    the mode's own pool (mine and other players' puppets); npcKill a blow of mine on one of mine; npcRemove
++//              one of mine gone with no body; bodyOf the pool's record a body key names (a puppet's: theirs).
++//   settlePile a dungeon pile's flat after its list was edited (DUNGEON_EDITS __dfoSettlePile: an emptied bag goes).
++//   openList   the game's own loot window over a list the caller owns (legacyOpenRemains' shape), any mode.
+ // The quest path's reads (questPath.js): the feet, the dungeon's navmesh, the collider and doors a mesh is baked from,
+ // the room's identity, a point on screen, and the way in (the dungeon's start marker, a building's entrance).
+ // No `//` inside the hook: it is laid on one line.
+@@ -136,6 +145,63 @@ const WORLD_HOOK = `import('../devtools/overlay/tap.js').then((m) => m.tapWorld(
+       hudFade.fadeHUDFromBlack();
+     }
+   },
++  spawnNpc: (type, o) => {
++    o = o || {};
++    if (townTalk.overlayActive || !playerSpawned) return Promise.resolve({ why: 'busy' });
++    const mode = modes?.mode ?? 'exterior';
++    const extra = { level: Number.isFinite(o.level) ? o.level : null, gender: o.gender ?? null, eliteFoe: o.elite == null ? undefined : !!o.elite };
++    const place = { allied: !!o.allied, minDistance: Number.isFinite(o.near) ? o.near : 4, maxDistance: Number.isFinite(o.far) ? o.far : 20 };
++    if (mode === 'interior') return Promise.resolve(modes?.dfoStandInside?.(type, o, extra, place) ?? null).then((f) => f ?? { why: 'spot' });
++    if (mode !== 'exterior' && mode !== 'dungeon') return Promise.resolve({ why: 'mode' });
++    const d = _dungeonPool();
++    return Promise.resolve(standLooseFoe({
++      collider: d ? d.collider : collider, feet: enchantFeet(), yawRad: cam.yaw, fovDegrees: fieldOfView() * 180 / Math.PI, foes: enchantFoes(),
++      spawn: (mt, pos, s) => (d
++        ? d.spawnLooseFoe(mt, pos, { yawRad: s.yawRad, allied: s.allied, level: extra.level, gender: extra.gender, eliteFoe: !!extra.eliteFoe })
++        : exteriorFoes.spawnFoe(mt, pos, { yaw: s.yawRad, allied: s.allied, loose: true, transient: true, grantKind: o.grantKind ?? null, level: extra.level, gender: extra.gender, eliteFoe: extra.eliteFoe })),
++    }, type, place)).then((f) => f ?? { why: 'spot' });
++  },
++  npcPool: () => {
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return modes?.dungeonCtx?.foes ?? [];
++    if (mode === 'interior') return modes?.insideFoes?.() ?? [];
++    return [...exteriorFoes.foes, ...cityGuards.guards];
++  },
++  npcKill: (f) => {
++    if (!f || f.dead || f.puppet) return false;
++    const mode = modes?.mode ?? 'exterior', hp = (f.entity?.health ?? 0) + 1;
++    if (mode === 'dungeon') { modes?.dungeonCtx?.damageFoe?.(f, hp, enchantFeet(), null, { fromPlayer: true, bypassShield: true }); return true; }
++    if (mode === 'interior') return !!modes?.dfoKillInside?.(f);
++    if (!exteriorFoes.foes.includes(f)) return false;
++    exteriorFoes.damageFoe(f, hp, enchantFeet(), null, { fromPlayer: true, bypassShield: true });
++    return true;
++  },
++  npcRemove: (f) => {
++    if (!f || f.puppet) return false;
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return !!modes?.dungeonCtx?.removeLooseFoe?.(f);
++    if (mode === 'interior') return !!modes?.dfoRemoveInside?.(f);
++    if (!exteriorFoes.foes.includes(f)) return false;
++    exteriorFoes.removeFoe(f);
++    return true;
++  },
++  bodyOf: (key) => {
++    if (typeof key !== 'string') return null;
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return key.startsWith('corpse:') ? modes?.dungeonCtx?.foes?.[Number(key.slice(7))] ?? null : null;
++    if (mode === 'interior') return modes?.dfoBodyOf?.(key) ?? null;
++    return key.startsWith('foeCorpse:') ? exteriorFoes.foes.find((f) => exteriorFoes.corpseKeyOf(f) === key) ?? null : null;
++  },
++  settlePile: (key) => { if (typeof key === 'string' && key.startsWith('loot:') && (modes?.mode ?? 'exterior') === 'dungeon') modes?.dungeonCtx?.__dfoSettlePile?.(Number(key.slice(5))); },
++  openList: (items, name) => {
++    if (townTalk.overlayActive && !townTalk.overlayDone) return false;
++    const hooks = { items: () => items, playerOwned: false, title: name, containerImage: () => CONTAINER_IMAGES.Chest, pos: [...enchantFeet()] };
++    const mode = modes?.mode ?? 'exterior';
++    if (mode !== 'exterior') return !!modes?.openLootList?.(items, hooks);
++    const w = makeInventoryWindow({ loot: hooks });
++    if (w) townTalk.showOverlay(w);
++    return !!w;
++  },
+   raiseSkillsNow: () => {
+     if (townTalk.overlayActive || !(playerEntity.health > 0)) return { why: 'busy' };
+     const was = playerEntity.lastSkillCheckTime;
+@@ -215,6 +281,20 @@ const MODES_HOOK = `import('../devtools/overlay/tap.js').then((m) => m.tapModes(
+     surfacePlayer();
+     return { why: 'ok', tally: r.tally, price };
+   },
++  dfoStandInside: (type, o, extra, place) => {
++    if (!interiorCtx || !interiorFoes) return null;
++    return standLooseFoe({
++      collider: interiorCtx.collider, feet: player.pos, yawRad: cam.yaw, fovDegrees: fieldOfView() * 180 / Math.PI, foes: interiorFoePool(),
++      spawn: (mt, pos, s) => interiorFoes.spawnFoe(mt, pos, { yaw: s.yawRad, allied: s.allied, loose: true, transient: true, grantKind: o?.grantKind ?? null, level: extra?.level ?? null, gender: extra?.gender ?? null, eliteFoe: extra?.eliteFoe }),
++    }, type, place ?? {});
++  },
++  dfoKillInside: (f) => {
++    if (!interiorFoes || !f || f.dead || f.puppet || !interiorFoes.foes.includes(f)) return false;
++    interiorFoes.damageFoe(f, (f.entity?.health ?? 0) + 1, player.pos, null, { fromPlayer: true, bypassShield: true });
++    return true;
++  },
++  dfoRemoveInside: (f) => { if (!interiorFoes || !f || f.puppet || !interiorFoes.foes.includes(f)) return false; interiorFoes.removeFoe(f); return true; },
++  dfoBodyOf: (key) => (typeof key === 'string' && key.startsWith('foeCorpse:') ? interiorFoes?.foes?.find((f) => interiorFoes.corpseKeyOf(f) === key) ?? null : null),
+   questMarksIn: (where, followedId) => {
+     if (where === 'dungeon') return dungeonCtx ? dungeonQuestMarks({
+       stands: dungeonQuestFlats, foes: dungeonCtx.foes ?? [], boxOf: questStandBox, followedId,
+@@ -361,6 +441,23 @@ const QL_EDITS = [
+   ['the take-all', '  if (isJunk(item)) return true;', '  if (isJunk(item) || __dfoLoot.leaves(item, __dfoLootReads)) return true;'],
+ ];
+ const QL_FOOT = "const __dfoLootReads = { material: __dfoMat, rank: rarityRank, ammo: isAmmunition, name: (it) => __dfoName(it).name };";
++// scenes/hostCombat.js spawnEnemyLoot's tail: the drop rule's door (dropRule.js, tap.js dropHook) - called with every foe
++// this client rolled loot for, after its cap, so the rule's pieces are laid last and the cap it lifts is already read
++const DROP_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const DROP_EDITS = [
++  ['the drop rule', '  capFoeLoot(entity);', "  capFoeLoot(entity); try { __dfoTap.dropHook.fn?.(entity, mobileType, basics, where); } catch (e) { console.warn('[overlay] drop rule', e); }"],
++];
++// ui/worldPlaque.js worldHoverFrame: the frame the plaque resolved and the host's contents reader, kept for the Loot
++// editor (tap.js hover) - what the plaque names under the crosshair is what the editor edits
++const PLAQUE_IMPORT = "import * as __dfoTapP from '../devtools/overlay/tap.js';";
++const PLAQUE_EDITS = [
++  ['the crosshair frame', 'const frame = markBodyStack(resolveHover(hit, { name, contents }));', 'const frame = markBodyStack(resolveHover(hit, { name, contents })); __dfoTapP.hover.set(frame, contents);'],
++];
++// scenes/dungeonContext.js: a pile's flat settled after the Loot editor changed its list (settleLootFlat is the
++// context's own; the window's close calls it) - laid beside lootContents on the context's API
++const DUNGEON_EDITS = [
++  ['the pile settle', '    lootContents(key) {', '    __dfoSettlePile(i) { settleLootFlat(i); }, lootContents(key) {'],
++];
+ const editAll = (ctx, code, edits, file) => {
+   let out = code;
+   for (const [what, from, to] of edits) {
+@@ -423,6 +520,15 @@ function overlayHooks() {
+         if (!/import \{[^}]*\blocalListAccepts\b[^}]*\}/.test(code)) this.error('[dfo-overlay] the Sell helper\'s door needs localListAccepts imported in src/ui/enhanced/enhancedTrade.js');
+         return { code: `${code}\n${TRADE_FOOT}\n`, map: null };
+       }
++      if (fileIs(id, '/src/scenes/hostCombat.js')) {
++        return { code: `${DROP_IMPORT} ${editAll(this, code, DROP_EDITS, 'src/scenes/hostCombat.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/ui/worldPlaque.js')) {
++        return { code: `${PLAQUE_IMPORT} ${editAll(this, code, PLAQUE_EDITS, 'src/ui/worldPlaque.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/scenes/dungeonContext.js')) {
++        return { code: editAll(this, code, DUNGEON_EDITS, 'src/scenes/dungeonContext.js'), map: null };
++      }
+       if (fileIs(id, '/src/systems/worldHover.js')) {
+         return { code: `${HOVER_IMPORT} ${editAll(this, code, HOVER_EDITS, 'src/systems/worldHover.js')}\n${HOVER_FOOT}\n`, map: null };
+       }
+warning: in the working copy of 'src/devtools/overlay/tap.js', LF will be replaced by CRLF the next time Git touches it
+[2026-11-04T04:42:12.750Z] Build is current.
+[2026-11-04T04:42:12.757Z] DFO Overlay is starting. Press Insert in game for the overlay.
