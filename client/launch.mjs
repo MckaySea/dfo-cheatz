@@ -248,6 +248,7 @@ function runGame() {
 if (flags.has('--run-game')) { runGame(); } else {
 const state = loadState();
 say(`── DFO Overlay ${new Date().toLocaleString()} ──`);
+git('checkout', '--', 'src/buildTag.js');   // a run closed mid-build leaves its stamp: no edit of anyone's, and it would read as one and rebuild
 if (!flags.has('--no-update')) update(state);
 const playable = build(state);
 saveState(state);
