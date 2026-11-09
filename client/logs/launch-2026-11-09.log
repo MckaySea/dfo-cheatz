@@ -69306,3 +69306,1063 @@ warning: in the working copy of 'src/devtools/overlay/panels/players.js', LF wil
 warning: in the working copy of 'src/devtools/overlay/panels/services.js', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'src/devtools/overlay/vite.overlay.config.js', LF will be replaced by CRLF the next time Git touches it
 [2026-11-09T01:17:07.818Z] Building the game with the overlay (about a minute)...
+[2026-11-09T01:22:47.251Z] ── DFO Overlay 11/8/2026, 5:22:47 PM ──
+overlay-dev
+ M src/buildTag.js
+ M src/devtools/overlay/index.js
+ M src/devtools/overlay/panels/players.js
+ M src/devtools/overlay/panels/services.js
+ M src/devtools/overlay/tap.js
+ M src/devtools/overlay/vite.overlay.config.js
+src/devtools/overlay.zip
+src/devtools/overlay/chest.js
+src/devtools/overlay/dropRule.js
+src/devtools/overlay/itemMint.js
+src/devtools/overlay/panels/autoloot.js
+src/devtools/overlay/panels/autopotion.js
+src/devtools/overlay/panels/boss.js
+src/devtools/overlay/panels/buffcaster.js
+src/devtools/overlay/panels/firmament.js
+src/devtools/overlay/panels/fly.js
+src/devtools/overlay/panels/hunt.js
+src/devtools/overlay/panels/lootedit.js
+src/devtools/overlay/panels/mounts.js
+src/devtools/overlay/panels/reveal.js
+src/devtools/overlay/panels/showtime.js
+src/devtools/overlay/panels/spawn.js
+src/devtools/overlay/panels/vampire.js
+src/devtools/overlay/panels/visit.js
+src/devtools/overlay/potionHook.js
+src/devtools/overlay/revenantGuide.js
+src/devtools/overlay/revenantKit.js
+[2026-11-09T01:22:48.526Z] !! There are uncommitted overlay edits - building them as they are; updating waits until they are committed.
+ M src/buildTag.js
+ M src/devtools/overlay/index.js
+ M src/devtools/overlay/panels/players.js
+ M src/devtools/overlay/panels/services.js
+ M src/devtools/overlay/tap.js
+ M src/devtools/overlay/vite.overlay.config.js
+src/devtools/overlay.zip
+src/devtools/overlay/chest.js
+src/devtools/overlay/dropRule.js
+src/devtools/overlay/itemMint.js
+src/devtools/overlay/panels/autoloot.js
+src/devtools/overlay/panels/autopotion.js
+src/devtools/overlay/panels/boss.js
+src/devtools/overlay/panels/buffcaster.js
+src/devtools/overlay/panels/firmament.js
+src/devtools/overlay/panels/fly.js
+src/devtools/overlay/panels/hunt.js
+src/devtools/overlay/panels/lootedit.js
+src/devtools/overlay/panels/mounts.js
+src/devtools/overlay/panels/reveal.js
+src/devtools/overlay/panels/showtime.js
+src/devtools/overlay/panels/spawn.js
+src/devtools/overlay/panels/vampire.js
+src/devtools/overlay/panels/visit.js
+src/devtools/overlay/potionHook.js
+src/devtools/overlay/revenantGuide.js
+src/devtools/overlay/revenantKit.js
+e87a0091a051aaf78de46f020737a6ef43608921
+diff --git a/src/buildTag.js b/src/buildTag.js
+index de450623df..a276f78692 100644
+--- a/src/buildTag.js
++++ b/src/buildTag.js
+@@ -1,2 +1,2 @@
+-export const BUILD_TAG = 'd9187c3049cb';
++export const BUILD_TAG = 'e87a0091a051';
+ export const UPDATE = null;
+diff --git a/src/devtools/overlay/index.js b/src/devtools/overlay/index.js
+index 1d51a32fde..ef11d16fd6 100644
+--- a/src/devtools/overlay/index.js
++++ b/src/devtools/overlay/index.js
+@@ -47,6 +47,21 @@ import { standingPanel } from './panels/standing.js';
+ import { caravanPanel } from './panels/caravan.js';
+ import { playersPanel } from './panels/players.js';
+ import { servicesPanel } from './panels/services.js';
++import { spawnPanel } from './panels/spawn.js';
++import { lootEditPanel } from './panels/lootedit.js';
++import { installDropRule } from './dropRule.js';
++import { vampirePanel, installVampireAuto } from './panels/vampire.js';
++import { mountsPanel, installMountsKeep } from './panels/mounts.js';
++import { potionsPanel, installAutoPotion } from './panels/autopotion.js';
++import { buffCasterPanel, installBuffCaster } from './panels/buffcaster.js';
++import { autoLootPanel, installAutoLoot } from './panels/autoloot.js';
++import { revealPanel } from './panels/reveal.js';
++import { firmamentPanel } from './panels/firmament.js';
++import { showtimePanel } from './panels/showtime.js';
++import { huntPanel } from './panels/hunt.js';
++import { visitPanel } from './panels/visit.js';
++import { bossPanel } from './panels/boss.js';
++import { flyPanel, installFly } from './panels/fly.js';
+ import { eventsPanel } from './panels/events.js';
+ import { presetLayout } from './presets.js';
+ import { createWelcome } from './welcome.js';
+@@ -61,6 +76,7 @@ const GROUPS = [
+   ['Journal', ['quests', 'questpath', 'lootlog', 'pack', 'events']],
+   ['Loot & trade', ['loot', 'lootfilter', 'sell']],
+   ['World', ['town', 'travel', 'caravan', 'players', 'services', 'nodes']],
++  ['Admin', ['spawn', 'lootedit', 'vampire', 'firmament', 'showtime', 'hunt', 'visit', 'boss', 'fly', 'mounts', 'potions', 'buffs2', 'autoloot', 'reveal']],
+   ['Overlay', ['glance', 'alerts', ...HOSTS, 'layouts', 'settings']],
+ ];
+ 
+@@ -118,10 +134,17 @@ export function bootOverlay() {
+   installAlerts();           // alerts watch with their panel closed
+   installGearKeys();         // gear hotkeys work with the panel closed; installed before the toggle key so a bind in progress takes every key
+   installQuestPath();        // the path draws and follows you with its panel closed
++  installDropRule();         // the drop rule lays its pieces on every foe rolled, panel open or not
++  installVampireAuto();      // the vampire auto rule turns an unturned admin, panel open or not
++  installMountsKeep();       // the mounts keep rule feeds every steed full, panel open or not
++  installAutoPotion();       // a potion drunk under a vital's line, panel open or not
++  installBuffCaster();       // the buff round's key, panel open or not
++  installAutoLoot();         // the loot sweep's clock, panel open or not
++  installFly();              // the fly pace modifier and the staff switches held on, panel open or not
+   const sell = sellPanel(wm);   // its watch rides the loop: the game's Sell window brings it up
+   const preset = (name) => { const L = presetLayout(name); if (L) wm.applyLayout(L); };
+   const welcome = createWelcome(root, preset);
+-  for (const make of [glancePanel, gearPanel, combatPanel, spellsPanel, lootPanel, buffsPanel, nodesPanel, townMapPanel, travelPanel, sessionPanel, lootLogPanel, lootFilterPanel, skillsPanel, packPanel, alertsPanel, inspectPanel, questsPanel, questPathPanel, standingPanel, caravanPanel, playersPanel, servicesPanel, eventsPanel, () => sell, () => layoutsPanel(wm),
++  for (const make of [glancePanel, gearPanel, combatPanel, spellsPanel, lootPanel, buffsPanel, nodesPanel, townMapPanel, travelPanel, sessionPanel, lootLogPanel, lootFilterPanel, skillsPanel, packPanel, alertsPanel, inspectPanel, questsPanel, questPathPanel, standingPanel, caravanPanel, playersPanel, servicesPanel, eventsPanel, spawnPanel, lootEditPanel, vampirePanel, firmamentPanel, showtimePanel, huntPanel, visitPanel, bossPanel, flyPanel, mountsPanel, potionsPanel, buffCasterPanel, autoLootPanel, revealPanel, () => sell, () => layoutsPanel(wm),
+     () => settingsPanel(wm, { welcome: () => welcome.show(), starter: () => preset('Starter') })]) {
+     try { wm.add(make()); } catch (e) { console.warn('[overlay] a panel failed to mount', e); }
+   }
+diff --git a/src/devtools/overlay/panels/players.js b/src/devtools/overlay/panels/players.js
+index be2b8754fc..eb0d1b03b1 100644
+--- a/src/devtools/overlay/panels/players.js
++++ b/src/devtools/overlay/panels/players.js
+@@ -1,104 +1,160 @@
+-// DFO OVERLAY - PLAYERS: the region's travellers the world map draws, and a jump to any of them by name, for any
+-// player - no party, no staff glyph, no cost (vite.overlay.config.js `jumpToTraveller`). It uses the places the map
+-// already holds. The load and the landing are the staff /tp's own; the refusals are party travel's.
++// DFO OVERLAY - PLAYERS: everyone online, wherever they are on the map, one press from a staff /tp @name. The list is the
++// hub's own (vite.overlay.config.js `everyoneOnline`: the World tab's link, its peers and `hubOnline`, the same two the
++// World tab lists), and a typed name also asks the hub's search (`askFind`), because past CHAT_ROSTER_MAX online the hub
++// lets `hubOnline` go and this link knows only its own shard.
++//   TP     runs /tp @name through the game's own staff door (`staff`), for any player, anywhere. The relay answers it for an
++//          account it verified as staff, and its answer lands in the chat, as a typed /tp's does.
++//   Jump   stays on a row the game can place without staff, and costs nothing:
++//            in my room   a step beside them, any mode, indoors too (`jumpToPeer`: partyArrival.js partyArrivalBeside)
++//            my party     the party's own journey to the leader, free (`jumpToMember`: partyTravelJourney at no fare)
++//            on the map   the region's travellers the world map draws (`jumpToTraveller`: the staff /tp's load)
+ 
+ import { worldTap } from '../tap.js';
+ import { h, fillIfChanged, toast } from '../ui.js';
+ 
+ const SAY = {
+   ok: (n, p) => `Jumped to ${n}${p ? ` at ${p}` : ''}.`,
+-  near: () => 'Landed in their map cell, but no open ground was found beside them.',
+-  gone: () => 'They left the map: indoors, logged out or hidden.',
++  near: () => 'No open ground was found beside them.',
++  gone: () => 'They are not there any more: gone indoors, logged out, hidden, or no pose has arrived yet.',
+   ship: () => 'They are on a ship at sea. A jump lands on no deck.',
+   veil: () => 'They are past the Veil. The game refuses a jump across it.',
+   wild: () => 'You cannot jump into or out of the open zone. Walk or ride its roads.',
+   battle: () => 'Leave your battle first.',
+   busy: () => 'Wait: a window is open, or something else is moving you.',
++  here: () => 'They are in your map cell already. Look around: they may be indoors here, or hidden.',
++  nogo: () => 'The journey did not set out.',
+ };
+ 
++/** Rows drawn at once: the panel redraws every second, and a name typed narrows the rest. */
++const MAX_ROWS = 150;
++
+ const norm = (s) => String(s ?? '').trim().toLowerCase();
+ const placeOf = (t) => t.place || (Number.isFinite(t.px) ? `${t.px}, ${t.py}` : 'unknown');
+ 
+-/** The one traveller a typed name means: an exact name, else the only one it starts, else the only one it is in. */
++/** The one player a typed name means: an exact name, else the only one it starts, else the only one it is in. `many`: it
++ *  fits several, so it must not be guessed at. */
+ export function matchName(list, typed) {
+   const q = norm(typed);
+   if (!q) return { hit: null, why: 'Type a name.' };
+   for (const test of [(n) => n === q, (n) => n.startsWith(q), (n) => n.includes(q)]) {
+     const hits = list.filter((t) => test(norm(t.name)));
+     if (hits.length === 1) return { hit: hits[0], why: '' };
+-    if (hits.length > 1) return { hit: null, why: `${hits.length} players match "${typed}". Type more of the name.` };
++    if (hits.length > 1) return { hit: null, many: true, why: `${hits.length} players match "${typed}". Type more of the name.` };
+   }
+-  return { hit: null, why: `No player called "${typed}" is on the map.` };
++  return { hit: null, why: `No player called "${typed}" is listed.` };
+ }
+ 
+ export function playersPanel() {
+-  let root, lastDraw = 0, typed = '', last = null, busy = false;   // last: { text, ok }
++  let listEl = null, lastDraw = 0, typed = '', last = null, busy = false;   // last: { text, ok }
+ 
+-  const list = () => {
+-    const rows = worldTap()?.travellers?.() ?? [];
+-    const me = worldTap()?.pixel?.();
+-    const far = (t) => (me && Number.isFinite(t.px) ? Math.hypot(t.px - me.x, t.py - me.y) : Infinity);
+-    return rows.filter((t) => t && t.name).map((t) => ({ ...t, far: far(t) })).sort((a, b) => a.far - b.far || a.name.localeCompare(b.name));
+-  };
++  const query = () => typed.trim().replace(/^@/, '').trim();
++  /** The room's players, nearest first. */
++  const here = () => (worldTap()?.peersHere?.() ?? []).filter((p) => p && p.name).sort((a, b) => a.far - b.far || a.name.localeCompare(b.name));
++  /** My party's other members, in seat order. */
++  const party = () => (worldTap()?.partyRows?.() ?? []).filter((m) => m && m.name);
++  /** The region's travellers. */
++  const travellers = () => (worldTap()?.travellers?.() ?? []).filter((t) => t && t.name);
+ 
+-  async function jump(t) {
++  /** Everyone, one row a name: the hub's list, with what the game knows of where they stand laid over it. The room's word
++   *  is the last laid, so it wins: it is the exact step. Those who only the room, party or map names are kept too. */
++  function everyone() {
++    const world = worldTap()?.everyoneOnline?.(query()) ?? null;
++    const rows = new Map();
++    const add = (name, patch) => { const k = norm(name); if (k) rows.set(k, { name, ...rows.get(k), ...patch }); };
++    for (const p of world?.rows ?? []) add(p.name, { guild: p.guild });
++    for (const t of travellers()) add(t.name, { jump: { kind: 'traveller', key: t.id, place: placeOf(t), off: !!t.ship }, where: `on the map, ${placeOf(t)}${t.ship ? ', at sea' : ''}` });
++    for (const m of party()) {
++      const can = m.present && Number.isFinite(m.px);
++      add(m.name, { party: true, ...(m.online ? {} : { offline: true }), ...(can ? { jump: { kind: 'member', key: m.acct, place: placeOf(m), off: false }, where: `${placeOf(m)}, ${m.in === 1 ? 'in a dungeon' : m.in === 2 ? 'indoors' : 'outdoors'}` } : {}) });
++    }
++    for (const p of here()) add(p.name, { jump: { kind: 'peer', key: p.id, place: '', off: false }, where: `in your room, ${Math.round(p.far)} m away`, ...(p.party ? { party: true } : {}), ...(p.guild ? { guild: p.guild } : {}) });
++    return { list: [...rows.values()].sort((a, b) => a.name.localeCompare(b.name)), total: world?.total ?? null, linked: !!world };
++  }
++
++  async function jump({ kind, key, place }, name) {
+     const tap = worldTap();
+-    if (!tap?.jumpToTraveller) { toast('The world is not ready yet.', 'bad'); return; }
++    const fn = kind === 'peer' ? tap?.jumpToPeer : kind === 'member' ? tap?.jumpToMember : tap?.jumpToTraveller;
++    if (!fn) { toast('The world is not ready yet.', 'bad'); return; }
+     if (busy) return;
+     busy = true;
+     render();
+     globalThis.dispatchEvent(new globalThis.Event('dfo:play'));   // index.js: EDIT mode ends, so the game has the screen
+     let r;
+-    try { r = await tap.jumpToTraveller(t.id); } catch (e) { r = `error:${e?.message ?? e}`; }
++    try { r = await fn(key); } catch (e) { r = `error:${e?.message ?? e}`; }
+     busy = false;
+     const code = typeof r === 'string' ? r : 'busy';
+-    const text = code.startsWith('error:') ? `The jump failed: ${code.slice(6)}` : (SAY[code] ?? SAY.busy)(t.name, t.place);
++    const text = code.startsWith('error:') ? `The jump failed: ${code.slice(6)}` : code.startsWith('refused:') ? code.slice(8) : (SAY[code] ?? SAY.busy)(name, place);
+     last = { text, ok: code === 'ok' };
+     toast(last.text, last.ok ? 'good' : 'bad');
+     render();
+   }
+ 
++  /** The staff /tp @name, as if typed. The hub's answer is async and lands in the chat, so 'ok' here is only "it ran". */
++  function tp(name) {
++    const fn = worldTap()?.staff;
++    if (!fn) { toast('The world is not ready yet.', 'bad'); return; }
++    const r = fn(`/tp @${name}`);
++    const ok = r === 'ok';
++    last = { text: ok ? `/tp @${name} sent. The hub's answer lands in your chat.` : typeof r === 'string' && r !== 'unknown' ? r : 'The /tp did not run: the world is not ready.', ok };
++    toast(last.text, ok ? 'good' : 'bad');
++    if (ok) globalThis.dispatchEvent(new globalThis.Event('dfo:play'));   // index.js: EDIT mode ends, so the game has the screen
++    render();
++  }
++
+   function byName() {
+-    const m = matchName(list(), typed);
+-    if (!m.hit) { toast(m.why, 'bad'); last = { text: m.why, ok: false }; render(); return; }
+-    jump(m.hit);
++    const q = query();
++    const m = matchName(everyone().list, q);
++    if (!q || m.many) { toast(m.why, 'bad'); last = { text: m.why, ok: false }; render(); return; }
++    tp(m.hit ? m.hit.name : q);   // a name this list does not hold may still be one the hub knows
+   }
+ 
+-  function row(t) {
+-    const tags = [t.lv != null ? `Lv ${t.lv}` : null, t.party ? 'party' : null, t.ship ? 'at sea' : null].filter(Boolean).join(' · ');
++  function row(r) {
++    const tags = [r.guild && typeof r.guild === 'string' ? r.guild : null, r.party ? 'party' : null, r.offline ? 'offline' : null].filter(Boolean).join(' · ');
+     return h('div.dfo-quest', null,
+       h('div.top', null,
+-        h('b.nm', { title: 'Jump to them' , onclick: () => jump(t) }, t.name),
++        h('b.nm', { title: `/tp @${r.name}`, onclick: () => tp(r.name) }, r.name),
+         tags ? h('span.time', null, tags) : null,
+-        h('button.dfo-btn', { title: `Jump beside ${t.name}`, disabled: busy || t.ship, onclick: () => jump(t) }, 'Jump')),
+-      h('div.where', null, `◈ ${placeOf(t)}${Number.isFinite(t.far) ? ` · ${Math.round(t.far)} cells away` : ''}`));
++        r.jump ? h('button.dfo-btn', { title: `Jump beside ${r.name}: no staff needed, no cost`, disabled: busy || r.jump.off, onclick: () => jump(r.jump, r.name) }, 'Jump') : null,
++        h('button.dfo-btn.primary', { title: `/tp @${r.name}: to them anywhere on the map`, onclick: () => tp(r.name) }, 'TP')),
++      r.where ? h('div.where', null, `◈ ${r.where}`) : null);
+   }
+ 
+   function render() {
+-    const rows = list();
+-    const input = h('input', { type: 'text', placeholder: 'Player name', value: typed, style: { flex: '1', minWidth: '0' },
+-      oninput: (e) => { typed = e.target.value; } });
+-    input.dfoKey = (e) => { if (e.key === 'Enter') { typed = input.value; byName(); } };
+-    fillIfChanged(root, h('div', null,
+-      h('div.dfo-note', { style: { marginTop: 0 } }, 'Type a name, or pick a player the world map shows, to jump beside them.'),
+-      h('div.dfo-row', { style: { marginTop: '6px' } },
+-        input,
+-        h('button.dfo-btn.primary', { disabled: busy, onclick: () => { typed = input.value; byName(); } }, busy ? 'Jumping…' : 'Jump')),
++    if (!listEl) return;
++    const { list, total, linked } = everyone();
++    const q = norm(query());
++    const shown = q ? list.filter((r) => norm(r.name).includes(q)) : list;
++    const hubHasMore = total != null && total > list.length + 1;   // +1: the hub's count holds me, this list does not
++    fillIfChanged(listEl,
++      worldTap()?.iAmStaff?.() === false ? h('div.dfo-dim', null, 'This account is not staff here, so TP will be refused. Jump still works on the rows that have it.') : null,
+       last && h('div.dfo-netrow', null, h('div', { style: { color: last.ok ? 'var(--dfo-good)' : 'var(--dfo-dim)' } }, last.text)),
+-      h('div.dfo-note', { style: { marginTop: '10px' } }, `On the map (${rows.length})`),
+-      rows.length
+-        ? h('div.dfo-quests', null, rows.map(row))
+-        : h('div.dfo-dim', null, 'Nobody is on the map. It shows players outdoors in your region who show themselves to travellers.')));
++      h('div.dfo-note', { style: { marginTop: '10px' } }, q ? `Matching "${query()}" (${shown.length})` : `Online (${total != null ? total - 1 : list.length})`),
++      !linked && !list.length ? h('div.dfo-dim', null, 'The hub link is not up yet.') : null,
++      linked && !shown.length ? h('div.dfo-dim', null, q ? 'Nobody listed matches. Press TP to ask the hub for that name anyway.' : 'Nobody else is online.') : null,
++      shown.length ? h('div.dfo-quests', null, shown.slice(0, MAX_ROWS).map(row)) : null,
++      shown.length > MAX_ROWS ? h('div.dfo-dim', { style: { marginTop: '8px' } }, `${shown.length - MAX_ROWS} more: type a name to narrow the list.`) : null,
++      hubHasMore && !q ? h('div.dfo-dim', { style: { marginTop: '8px' } }, `The hub counts ${total - 1} online and has listed ${list.length} here. Type a name to search the rest.`) : null);
+   }
+ 
+   return {
+-    id: 'players', title: 'Players', short: 'Players', w: 360, h: 420, minW: 260, minH: 200, x: 70, y: 150,
+-    mount(body) { root = body; render(); },
++    id: 'players', title: 'Players', short: 'Players', w: 360, h: 520, minW: 260, minH: 220, x: 70, y: 150,
++    mount(body) {
++      // The field is built once and the list below it redraws on its own, so a redraw never takes a name being typed
++      const input = h('input', { type: 'text', placeholder: 'Player name', value: typed, style: { flex: '1', minWidth: '0' },
++        oninput: (e) => { typed = e.target.value; render(); } });
++      input.dfoKey = (e) => { if (e.key === 'Enter') { typed = input.value; byName(); } };
++      listEl = h('div');
++      body.replaceChildren(
++        h('div.dfo-note', { style: { marginTop: 0 } }, 'Everyone online, anywhere on the map. TP runs the staff /tp @name. Jump, where a row has it, needs no staff.'),
++        h('div.dfo-row', { style: { marginTop: '6px' } },
++          input,
++          h('button.dfo-btn.primary', { onclick: () => { typed = input.value; byName(); } }, 'TP')),
++        listEl);
++      render();
++    },
+     update(now) {
+       if (now - lastDraw < 1000) return;
+       lastDraw = now;
+-      // a name being typed keeps its field: the list redraws only while the field is not focused
+-      if (root?.contains(document.activeElement) && document.activeElement?.tagName === 'INPUT') return;
+       render();
+     },
+   };
+diff --git a/src/devtools/overlay/panels/services.js b/src/devtools/overlay/panels/services.js
+index c203c6114f..b46a916f76 100644
+--- a/src/devtools/overlay/panels/services.js
++++ b/src/devtools/overlay/panels/services.js
+@@ -23,6 +23,23 @@
+ // SKILLS (tap.js noSkillWait, noTrainWait, freeTrain): the skill check's 6-hour wait skipped, Check skills now running
+ // the check a rest's end runs, and training (opened here at a stand-in Mages Guild) with no 12-hour wait and no fee. A
+ // skill still rises only on its practice, and training still stops at its cap: the raises are the game's own.
++//
++// SET A SKILL: the client-trust test on the sheet itself. Any skill written to any value, one or all; the level sum and
++// the level-up check are the game's own (skills.js levelUpSkillSum, advancement.js checkForLevelUp), so a level owed is
++// left pending exactly as a raise leaves it. Past 100 the game reads a skill only with Master Skills on.
++//
++// FREE COUNTERS (tap.js freeReforge, freeBuySpell, freeCounter): the Mages Guild Reforge's purse - gold and shards, for
++// the reforge, the hone, the gems and the imprint - read as bottomless and never drawn on; the spellbook's bought spell
++// inscribed at no cost; the trade window's deal (an identify, a magic shelf's buy, a repair) concluded at no price. The
++// pieces' and the spells' law is untouched. EVERYTHING FREE turns every switch on this panel on at once.
++//
++// FREE POTIONS (tap.js freePotion, potionHook.js): the Mages Guild potion maker lists every recipe the game knows and
++// opens empty-handed; a recipe whose ingredients are not carried fills the cauldron with phantom units of its own
++// templates, so DFU's hash names it; Mix spends nothing and asks no station's brew. The potion is the game's own mint.
++//
++// NO CARRY LIMIT (tap.js noCarryLimit): the pack's ceiling - combat/formulas.js entityMaxEncumbrance, PlayerEntity's
++// MaxEncumbrance, which every pickup, buy, bank draw, forage and readout asks - answers Infinity. Nothing is too heavy;
++// the sheets print "Infinity". The weight itself is still weighed where the game weighs it (the swim rule's 62.5 kg).
+ 
+ import { GUILD_GROUPS } from '../../../formats/factionFile.js';
+ import { isOnlinePage } from '../../../systems/online/onlineLane.js';
+@@ -33,8 +50,9 @@ import { itemBaseValue } from '../../../systems/item/itemTemplates.js';
+ import { AFFIX_RANGES, affixBand, affixLabel, affixesWorth, validAffix } from '../../../systems/loot/lootRarity.js';
+ import { addGold, goldAmount, deductGoldPieces } from '../../../systems/court.js';
+ import { GOLD_INT_MAX } from '../../../systems/item/itemLaw.js';
+-import { SKILLS } from '../../../systems/skills.js';
+-import { modesTap, worldTap, freeSummon, freeEnchant, freeSpell, noSkillWait, noTrainWait, freeTrain } from '../tap.js';
++import { SKILLS, SKILL_NAMES, permanentSkillValue, levelUpSkillSum } from '../../../systems/skills.js';
++import { checkForLevelUp } from '../../../systems/advancement.js';
++import { modesTap, worldTap, freeSummon, freeEnchant, freeSpell, noSkillWait, noTrainWait, freeTrain, freeReforge, freeBuySpell, freeCounter, noCarryLimit, freePotion } from '../tap.js';
+ import { h, fillIfChanged, toast, numInput } from '../ui.js';
+ 
+ const SERVICES = [
+@@ -124,6 +142,41 @@ export function servicesPanel() {
+     render();
+   }
+ 
++  // SET A SKILL: pick a skill and a value, Set writes it (All writes every skill); then the level sum and the level-up
++  // check the game runs after a raise, so a level owed is pending as a raise would leave it
++  let skillId = SKILLS.Alteration, skillTo = 100;
++  const skillRows = () => Array.from({ length: SKILL_NAMES.length }, (_, id) => ({ id, name: SKILL_NAMES[id] ?? String(id), value: permanentSkillValue(playerEntity, id) }));
++  function writeSkill(ids, v) {
++    const value = Math.max(1, Math.min(300, Math.trunc(v)));
++    if (!Number.isFinite(value)) { toast('Give a whole number.', 'bad'); return; }
++    if (typeof playerEntity.skills === 'number') { toast('This sheet holds one flat skill value: not a player sheet.', 'bad'); return; }
++    playerEntity.skills ??= [];
++    for (const id of ids) { playerEntity.skills[id] = value; if (playerEntity.skillOverrides) delete playerEntity.skillOverrides[id]; }
++    let up = false;
++    try {
++      const sum = levelUpSkillSum(playerEntity);
++      if (!(playerEntity.currentLevelUpSkillSum >= sum)) playerEntity.currentLevelUpSkillSum = sum;
++      up = checkForLevelUp(playerEntity);
++    } catch (e) { console.warn('[overlay] level sum', e); }
++    const text = `${ids.length === 1 ? SKILL_NAMES[ids[0]] : `All ${ids.length} skills`} set to ${value}.${up ? ' A level up is pending: open the level-up window.' : ''}`;
++    last = { label: 'Set skill', text, ok: false };
++    toast(text, 'good');
++    render();
++  }
++  function skillsRow() {
++    const rows = skillRows();
++    return h('div.dfo-row', { style: { marginTop: '4px' } },
++      h('select', { title: 'Skill', style: { maxWidth: '55%' }, onchange: (e) => { skillId = +e.target.value; } },
++        rows.map((r) => h('option', { value: r.id, selected: r.id === skillId }, `${r.name} (${r.value})`))),
++      numInput('to', skillTo, (n) => { skillTo = n; }, { min: 1, max: 300, width: 54 }),
++      h('button.dfo-btn', { title: 'Write the value onto this skill', onclick: () => writeSkill([skillId], skillTo) }, 'Set'),
++      h('button.dfo-btn', { title: 'Write the value onto every skill', onclick: () => writeSkill(rows.map((r) => r.id), skillTo) }, 'All'));
++  }
++
++  const ALL_FREE = [freeSummon, freeEnchant, freeSpell, freeTrain, noSkillWait, noTrainWait, freeReforge, freeBuySpell, freeCounter, freePotion];
++  const allFree = () => ALL_FREE.every((f) => f.on);
++  function setAllFree(on) { for (const f of ALL_FREE) f.on = on; toast(on ? 'Everything free: every switch on.' : 'Every switch off.', on ? 'good' : ''); render(); }
++
+   function trainRow() {
+     const list = trainList();
+     if (!list.length) return h('div.dfo-dim', null, 'Training appears once the world is up.');
+@@ -239,12 +292,32 @@ export function servicesPanel() {
+       h('label.dfo-row', { style: { marginTop: '4px' }, title: 'Any spell made, here or at a guild, passes the purse check and takes no gold' },
+         h('input', { type: 'checkbox', checked: freeSpell.on, onchange: (e) => { freeSpell.on = e.target.checked; render(); } }),
+         h('span', null, freeSpell.on ? 'Free spell making: on. No gold is checked or taken.' : 'Free spell making: off. A spell costs what the game asks.')),
++      h('label.dfo-row', { style: { marginTop: '4px' }, title: 'The Mages Guild Reforge - reforge, hone, gems, imprint - reads a bottomless purse of gold and shards and takes none' },
++        h('input', { type: 'checkbox', checked: freeReforge.on, onchange: (e) => { freeReforge.on = e.target.checked; render(); } }),
++        h('span', null, freeReforge.on ? 'Free Reforge and imprint: on. No gold or shards are checked or taken.' : 'Free Reforge and imprint: off. They cost what the guild asks.')),
++      h('label.dfo-row', { style: { marginTop: '4px' }, title: 'A spell bought from the spellbook passes the purse check and costs nothing' },
++        h('input', { type: 'checkbox', checked: freeBuySpell.on, onchange: (e) => { freeBuySpell.on = e.target.checked; render(); } }),
++        h('span', null, freeBuySpell.on ? 'Free spell buying: on. No gold is checked or taken.' : 'Free spell buying: off. A spell costs what the hall asks.')),
++      h('label.dfo-row', { style: { marginTop: '4px' }, title: 'The trade window - an identify, the magic shelf, a repair, any shop\'s buy - and a keyed shelf\'s row conclude at no price. Sales still pay' },
++        h('input', { type: 'checkbox', checked: freeCounter.on, onchange: (e) => { freeCounter.on = e.target.checked; render(); } }),
++        h('span', null, freeCounter.on ? 'Free counter: on. Identify, the magic shelf and every buy cost nothing.' : 'Free counter: off. The counter charges what the game asks.')),
++      h('label.dfo-row', { style: { marginTop: '4px' }, title: 'The potion maker lists every recipe, opens with no ingredients, fills a recipe you cannot fill with phantom units, and Mix spends nothing. The potion is the game\'s own' },
++        h('input', { type: 'checkbox', checked: freePotion.on, onchange: (e) => { freePotion.on = e.target.checked; render(); } }),
++        h('span', null, freePotion.on ? 'Free potions: on. Any recipe, no ingredients used.' : 'Free potions: off. A potion takes its ingredients, and a recipe you carry.')),
++      h('div.dfo-row', { style: { marginTop: '6px' } },
++        h('button.dfo-btn.primary', { title: 'Every switch on this panel on: free summoning, enchanting, spell making and buying, training with no waits, the Reforge, the counter and the potion maker', onclick: () => setAllFree(!allFree()) }, allFree() ? 'Everything paid again' : 'Everything free')),
++      h('div.dfo-note', { style: { marginTop: '10px' } }, 'Carry: the pack\'s ceiling, which every pickup, buy, bank draw and forage asks.'),
++      h('label.dfo-row', { style: { marginTop: '6px' }, title: 'PlayerEntity.MaxEncumbrance answers Infinity: any weight is taken, bought, drawn or gathered, and the sheets print "Infinity". The swim rule still weighs the pack itself' },
++        h('input', { type: 'checkbox', checked: noCarryLimit.on, onchange: (e) => { noCarryLimit.on = e.target.checked; render(); } }),
++        h('span', null, noCarryLimit.on ? 'No carry limit: on. Nothing is too heavy.' : 'No carry limit: off. The pack holds floor(Strength × 1.5) kg plus any weight allowance.')),
+       h('div.dfo-note', { style: { marginTop: '10px' } }, 'Skills: a skill still needs practice to rise. Training stops at 50.'),
+       h('label.dfo-row', { style: { marginTop: '6px' }, title: 'Every skill check raises, with no 6-hour wait: a rest, a trip, or Check skills now' },
+         h('input', { type: 'checkbox', checked: noSkillWait.on, onchange: (e) => { noSkillWait.on = e.target.checked; render(); } }),
+         h('span', null, noSkillWait.on ? 'No skill wait: on. Every check can raise a skill.' : 'No skill wait: off. Checks are 6 game hours apart.')),
+       h('div.dfo-row', { style: { marginTop: '4px' } },
+         h('button.dfo-btn', { title: 'Run the skill check a rest runs, now', onclick: checkSkills }, 'Check skills now')),
++      h('div.dfo-note', { style: { marginTop: '8px' } }, 'Set a skill: writes any value onto a skill of your sheet, or onto all of them. The level check runs as after a raise.'),
++      skillsRow(),
+       h('label.dfo-row', { style: { marginTop: '4px' }, title: 'Train again at once, with no 12-hour wait' },
+         h('input', { type: 'checkbox', checked: noTrainWait.on, onchange: (e) => { noTrainWait.on = e.target.checked; render(); } }),
+         h('span', null, noTrainWait.on ? 'No training wait: on. Train as often as you like.' : 'No training wait: off. Training is 12 game hours apart.')),
+@@ -268,7 +341,7 @@ export function servicesPanel() {
+       if (now - lastLook < 500) return;
+       lastLook = now;
+       // the training row's skills too: the world comes up after the panel mounts, and free training moves no gold
+-      const s = `${packSig()}~${trainList().map((t) => `${t.id}:${t.value}`).join(',')}`;
++      const s = `${packSig()}~${trainList().map((t) => `${t.id}:${t.value}`).join(',')}~${skillRows().map((r) => r.value).join(',')}~${ALL_FREE.map((f) => (f.on ? 1 : 0)).join('')}${noCarryLimit.on ? 'c' : ''}`;
+       if (s !== sig) { sig = s; render(); }
+     },
+   };
+diff --git a/src/devtools/overlay/tap.js b/src/devtools/overlay/tap.js
+index a01f9fb281..836bdde530 100644
+--- a/src/devtools/overlay/tap.js
++++ b/src/devtools/overlay/tap.js
+@@ -47,3 +47,75 @@ export const freeTrain = { on: false };
+ // The world frame's draw door (vite.overlay.config.js WORLD_EDITS): called with the renderer in the veiled slot, after
+ // the opaque world, every frame. The quest path sets it
+ export const drawHook = { fn: null };
++
++// The crosshair's frame (ui/worldPlaque.js worldHoverFrame, vite.overlay.config.js PLAQUE_EDITS): what the plaque names
++// under the crosshair this frame - its key, its rows - and the host's own contents reader (the live list a key names),
++// for the Loot editor. Set every frame the plaque resolves; a frame older than a few hundred ms is gone
++export const hover = {
++  frame: null, contents: null, at: 0,
++  set(frame, contents) { this.frame = frame ?? null; this.contents = typeof contents === 'function' ? contents : null; this.at = performance.now(); },
++};
++
++// The drop rule's door (scenes/hostCombat.js spawnEnemyLoot's tail, vite.overlay.config.js DROP_EDITS): called with every
++// foe whose loot this client rolled, after its cap - (entity, mobileType, basics, where). dropRule.js sets it
++export const dropHook = { fn: null };
++
++// The Services panel's free counters (staff tests), each read by a build-time edit (vite.overlay.config.js):
++//   freeReforge   REFORGE_EDITS, CODEX_EDITS: the Mages Guild Reforge's purse - gold and shards - is read as bottomless and
++//                 never drawn on, for the reforge, the hone, the gems and the imprint; each piece's law is untouched
++//   freeBuySpell  SPELLBOOK_EDITS: the spellbook's purse check passes and a bought spell is inscribed at no cost
++//   freeCounter   COUNTER_EDITS: the trade window's purse reads bottomless and a deal (a buy, a repair, an identify) is
++//                 concluded at no price; a keyed shelf's row likewise. A sale still pays as the game pays it
++export const freeReforge = { on: false };
++export const freeBuySpell = { on: false };
++export const freeCounter = { on: false };
++
++// The Services panel's carry switch (a staff test), read by a build-time edit (vite.overlay.config.js CARRY_EDITS):
++//   noCarryLimit  combat/formulas.js entityMaxEncumbrance - DaggerfallEntity.MaxEncumbrance, the ONE ceiling every reader
++//                 asks (the pack's take, the shelf's buy, the bank's gold draw, the materials bag, the forage, the sheets'
++//                 readouts) - answers Infinity: nothing is too heavy. The weight itself is still weighed (the swim rule)
++export const noCarryLimit = { on: false };
++
++// The Services panel's free potions (a staff test), read by potionHook.js through four one-line build-time edits
++// (vite.overlay.config.js POTION_HOST_EDITS, POTION_WINDOW_EDITS): the potion maker lists every recipe the game knows,
++// opens empty-handed, fills a recipe's cauldron with phantom units where the ingredients are not carried, asks no
++// station's brew, and spends nothing on the mix. The potion is the game's own mint
++export const freePotion = { on: false };
++
++// The Firmament panel's free respec (a staff test), read by two one-line build-time edits in net/firmament/firmamentBook.js
++// (vite.overlay.config.js FIRM_EDITS): while on, the respec's local gold check passes and its 10,000 gold is not reserved
++// from the wallet, so the whole sky comes back - every star and the birthsign - with no gold drawn here and, by the shared
++// law, no silver (firmamentLaw.js FIRM_RESPEC_GOLD: 'no silver'). The respec itself is the service's own
++export const freeFirm = { on: false };
++
++// The Spawn panel's revenant switch (a staff test), read by a one-line build-time edit in systems/revenant/revenant.js
++// (vite.overlay.config.js REVENANT_EDITS): while on, the revenants' RENOWN-GATE is not held - online under Renown 10 a
++// revenant may be made, stand, yield and be sworn as past it. Everything else of a revenant is the game's own law
++export const noRevenantHold = { on: false };
++
++// The Showtime panel's aura (a stream's spectacle), read by scenes/auraHost.js through a build-time edit
++// (vite.overlay.config.js SHOW_EDITS): while set, it is worn at my own feet in the token's place - this screen's alone
++export const showtime = { aura: null };
++
++// The Hunt panel's possession: the foe of mine the staff boss pilot steers (systems/staffBossPilot.js, a build-time edit
++// lets it steer any foe wearing dfoPossess), read by scenes/staffPilotHost.js as the boss it watches (PILOT_HOST_EDITS)
++export const possess = { foe: () => null };
++
++// The Boss panel's camera: while set, called each frame with the camera after the player's eye (scenes/staffPilotHost.js
++// eye, PILOT_HOST_EDITS) - it moves cam.pos behind the boss, a third-person view of the body I drive
++export const bossEye = { fn: null };
++
++// The Spawn panel's chosen revenant art: `lookup(id)` answers the art kept on the record, or null for the game's own draw
++// (systems/revenant/revenantArts.js drawArt, ARTS_EDITS)
++export const revenantArt = { lookup: null };
++
++// The Mounts panel's chosen steed stats: `of(item)` answers the born stats it chose for a horse or the dragon ({ speed,
++// stamina, endurance, strength }), or null for the game's own seed (systems/steedCare.js horseBornStats, STEED_EDITS)
++export const steedBorn = { of: null };
++
++// The Reveal panel's switches (panels/reveal.js), read by two build-time edits (vite.overlay.config.js WORLD_EDITS):
++//   on     the world's draw reads a concealed player's pose as an open one
++//   local  the Local chat tab's Nearby roster lists concealed players too
++// 7 is left as it came: a staff member steering an event's boss (systems/effects.js concealBits)
++export const revealConcealed = { on: true, local: true };
++export const revealCv = (bits) => (revealConcealed.on && (bits & 7) !== 7 ? 0 : bits);
+diff --git a/src/devtools/overlay/vite.overlay.config.js b/src/devtools/overlay/vite.overlay.config.js
+index f72020f0ce..8a87da34f7 100644
+--- a/src/devtools/overlay/vite.overlay.config.js
++++ b/src/devtools/overlay/vite.overlay.config.js
+@@ -33,8 +33,30 @@ const MAIN_HOOK = "import('./devtools/overlay/index.js').then((m) => m.bootOverl
+ //              staff /tp's load (prepareStaffDestination), set down on open ground beside them (openGroundNear).
+ //              Refused as party travel is: a battle, the Veil, into or out of the open zone, a ship at sea, and
+ //              while anything else moves the player.
++//   peersHere   every player in my presence room (peersNear: their feet in this scene's frame), their name, account and concealment
++//   everyoneOnline  everyone the hub's link knows of (its peers, `hubOnline`, and a search's `hubFound`), for the Players
++//               panel's /tp; iAmStaff whether this session may run it
++//   jumpToPeer  a step beside one of them, any mode, indoors too: the party arrival's own beside-landing off their feet
++//               (partyArrival.js partyArrivalBeside over the mode's collider). Refused in a battle or while moving.
++//   partyRows   my party's other members with their party pose (pixel, in a dungeon / a building / the open air, place)
++//   jumpToMember  the party's own journey to the leader, made for ANY member and free: partyTravelJourney at no fare
++//               (the wagon rider's precedent) - beside them in the open air (besideTargetOf off their pose), at the
++//               place's door indoors. The map door's own rungs first (partyTravelRefusal). A member standing in my
++//               room is a jumpToPeer. The hub fans a pose to the party alone: no rule here can place a non-member.
+ //   raiseSkillsNow  the skill check a rest's end and a trip's arrival run (raisePlayerSkills, the same boxes), run now.
+ //              Its own wait still holds unless the Services panel's noSkillWait is on.
++//   spawnNpc   ADMIN TEST SERVER (panels/spawn.js): a foe stood in front of the player through DFU's own placement law
++//              (hostEnchant.js standLooseFoe, as _standLooseFoe stands a summoning's squad) in the pool of the mode -
++//              the street's (exteriorFoes.spawnFoe: a loose, transient stand under the grant kind asked), a building's
++//              (the modes hook's dfoStandInside), the dungeon's (dungeonCtx.spawnLooseFoe) - with its level, gender,
++//              elite and side. Answers the record, or { why } (busy, mode, spot).
++//   npcPool    the mode's own pool (mine and other players' puppets); npcKill a blow of mine on one of mine; npcRemove
++//              one of mine gone with no body; bodyOf the pool's record a body key names (a puppet's: theirs).
++//   npcDown    a whole blow of mine on one of my revenants: it kneels, past its last stand and its will (revenantFate.js
++//              ownersWholeKill), never past the kill-or-spare. Answers whether it knelt.
++//   myLevel    the level a class body stands at when none is asked; careerOf a kind's career file, for the Spawn panel's guide
++//   settlePile a dungeon pile's flat after its list was edited (DUNGEON_EDITS __dfoSettlePile: an emptied bag goes).
++//   openList   the game's own loot window over a list the caller owns (legacyOpenRemains' shape), any mode.
+ // The quest path's reads (questPath.js): the feet, the dungeon's navmesh, the collider and doors a mesh is baked from,
+ // the room's identity, a point on screen, and the way in (the dungeon's start marker, a building's entrance).
+ // No `//` inside the hook: it is laid on one line.
+@@ -136,6 +158,173 @@ const WORLD_HOOK = `import('../devtools/overlay/tap.js').then((m) => m.tapWorld(
+       hudFade.fadeHUDFromBlack();
+     }
+   },
++  peersHere: () => {
++    const me = player.feetAt?.() ?? player.pos;
++    return (peersNear({ presenceOnly: true }) ?? []).map((p) => {
++      const rec = online?.peers?.get(p.id);
++      const acct = social?.accountOfPeer?.(p.id) ?? null;
++      return { id: p.id, name: rec?.name ?? '', acct, party: !!(acct && social?.inMyParty?.(acct)), guild: online?.guildTagOf?.(p.id) ?? null, cv: p.cv | 0, far: Math.hypot(p.feet[0] - me[0], p.feet[2] - me[2]) };
++    });
++  },
++  everyoneOnline: (q) => {
++    const hub = chatLinks?.get('world');
++    if (!hub) return null;
++    hub.sendHubWho?.();
++    const ask = String(q ?? '').trim();
++    if (ask) hub.askFind?.(ask);
++    const found = ask && Array.isArray(hub.hubFound?.l) ? hub.hubFound.l : [];
++    const rows = new Map();
++    for (const p of [...(hub.peers?.values?.() ?? []), ...(hub.hubOnline?.values?.() ?? []), ...found]) {
++      if (p?.id && p.name && p.id !== hub.id && !rows.has(p.id)) rows.set(p.id, { id: p.id, name: p.name, guild: p.gt ?? null });
++    }
++    return { rows: [...rows.values()], total: hub.roomCount ?? null };
++  },
++  iAmStaff: () => isStaffT(staffGlyphs()),
++  myLevel: () => effectiveLevel(playerEntity),
++  careerOf: (id) => __dfoCareer(id, fetchBytes),
++  jumpToPeer: (id) => {
++    if (townTalk.overlayActive || !walkMode || !playerSpawned || worldMoveBusy() || modes?.transitioning || _teleporting || seatOut() || !(playerEntity.health > 0)) return 'busy';
++    if (siegeSession?.active() || royalSession?.active() || modes?.roomIdentity?.()?.kind === 'arena') return 'battle';
++    const p = (peersNear({ presenceOnly: true }) ?? []).find((x) => x.id === id);
++    if (!p) return 'gone';
++    const c = csaModeCollider();
++    if (!c) return 'near';
++    const land = __dfoBeside([p.feet[0], p.feet[1], p.feet[2]], c, 0, p.feet[1] - 1);
++    if (!land) return 'near';
++    modes?.setPlayerLocalPosition?.(land.pos);
++    if (land.yaw != null) { cam.yaw = land.yaw; lookFilter.settle(); }
++    surfacePlayer();
++    return 'ok';
++  },
++  partyRows: () => {
++    const party = social?.party;
++    if (!party) return [];
++    return party.members.filter((x) => x.acct !== social.acct).map((x) => ({
++      acct: x.acct, name: x.name ?? '', leader: party.leader === x.acct, online: x.online !== false, present: memberPresent(x),
++      px: x.p?.px ?? null, py: x.p?.py ?? null, in: x.p?.in ?? null, loc: x.p?.loc ?? '',
++      place: x.p ? (locationIndex.get(x.p.px + ',' + x.p.py)?.name ?? (x.p.loc || null)) : null,
++    }));
++  },
++  jumpToMember: async (acct) => {
++    if (townTalk.overlayActive || !walkMode || !playerSpawned || worldMoveBusy() || modes?.transitioning || _teleporting || seatOut() || !(playerEntity.health > 0)) return 'busy';
++    if (siegeSession?.active() || royalSession?.active() || modes?.roomIdentity?.()?.kind === 'arena') return 'battle';
++    const row = social?.party?.members.find((x) => x.acct === acct);
++    if (!row?.p || !memberPresent(row)) return 'gone';
++    const peer = (peersNear({ presenceOnly: true }) ?? []).find((x) => social?.accountOfPeer?.(x.id) === acct);
++    if (peer) return m.worldTap()?.jumpToPeer?.(peer.id) ?? 'busy';
++    const to = { x: row.p.px, y: row.p.py };
++    const at = playerTravelPixel();
++    if (at && at.x === to.x && at.y === to.y) return 'here';
++    const refusal = partyTravelRefusal();
++    if (refusal) return 'refused:' + refusal;
++    const fare = partyTripFare(to, travelMapPopUpState());
++    const name = partyPlaceName(to, row.p.loc || '');
++    const who = row.name || 'your party member';
++    const pick = {
++      pixel: to, name,
++      besideAt: () => { const r = social?.party?.members.find((x) => x.acct === acct); return r && memberPresent(r) ? __dfoBesideOf(r.p, to.x, to.y) : null; },
++      besideText: 'You join ' + who + ' at ' + name + '.',
++      besideMissedText: 'There was no room beside ' + who + '. You arrive at ' + name + '.',
++      besideSeat: 0,
++    };
++    const went = await partyTravelJourney(pick, fare.opts, { ...fare.computed, totalCost: 0, piecesCost: 0 });
++    return went ? 'ok' : 'nogo';
++  },
++  spawnNpc: (type, o) => {
++    o = o || {};
++    if (townTalk.overlayActive || !playerSpawned) return Promise.resolve({ why: 'busy' });
++    const mode = modes?.mode ?? 'exterior';
++    const extra = { level: Number.isFinite(o.level) ? o.level : null, gender: o.gender ?? null, eliteFoe: o.elite == null ? undefined : !!o.elite };
++    const place = { allied: !!o.allied, minDistance: Number.isFinite(o.near) ? o.near : 4, maxDistance: Number.isFinite(o.far) ? o.far : 20, lineOfSightCheck: o.los !== false };
++    if (mode === 'interior') return Promise.resolve(modes?.dfoStandInside?.(type, o, extra, place) ?? null).then((f) => f ?? { why: 'spot' });
++    if (mode !== 'exterior' && mode !== 'dungeon') return Promise.resolve({ why: 'mode' });
++    const d = _dungeonPool();
++    return Promise.resolve(standLooseFoe({
++      collider: d ? d.collider : collider, feet: Array.isArray(o.at) && o.at.length === 3 && o.at.every(Number.isFinite) ? o.at : enchantFeet(), yawRad: cam.yaw, fovDegrees: fieldOfView() * 180 / Math.PI, foes: enchantFoes(),
++      spawn: (mt, pos, s) => (d
++        ? d.spawnLooseFoe(mt, pos, { yawRad: s.yawRad, allied: s.allied, level: extra.level, gender: extra.gender, eliteFoe: !!extra.eliteFoe })
++        : exteriorFoes.spawnFoe(mt, pos, { yaw: s.yawRad, allied: s.allied, loose: true, transient: true, grantKind: o.grantKind ?? null, level: extra.level, gender: extra.gender, eliteFoe: extra.eliteFoe })),
++    }, type, place)).then((f) => f ?? { why: 'spot' });
++  },
++  staff: (line) => { const c = parseDragonCommand(String(line)) ?? parseStaffLine(String(line), staffPowers()); if (!c) return 'unknown'; if ('error' in c) return c.error; runStaffCommand(chatLog?.active ?? chatLog?.tabs?.[0]?.id ?? null, c); return 'ok'; },
++  handOver: (f, id) => { if (!f || f.puppet || f.dead || typeof id !== 'string' || (modes?.mode ?? 'exterior') !== 'exterior' || !exteriorFoes.foes.includes(f)) return 0; return exteriorFoes.handOver((x) => (x === f ? id : null), (frame) => !!online?.sendFoes?.(frame)); },
++  shout: (text) => { try { return !!online?.sendChat?.(String(text)); } catch { return false; } },
++  peerCandidate: (id) => { const m = modes?.mode ?? 'exterior'; return (m === 'dungeon' ? modes?.dungeonCtx?.peerCandidate?.(id) : m === 'exterior' ? exteriorFoes.peerCandidate?.(id) : null) ?? null; },
++  tradeAsk: (id) => { try { if (tradeMgr.stateFor(id) === 'active') return 'ok'; const r = tradeMgr.request(id); return r?.ok ? 'ok' : (r?.why ?? 'refused'); } catch (e) { return String(e?.message ?? e); } },
++  tradeSession: () => { const s = tradeMgr.session; return s && !s.isOver ? s : null; },
++  tradeState: (id) => tradeMgr.stateFor(id),
++  peerHits: (fn) => { if (!exteriorFoes.dfoHitTapped) { const orig = exteriorFoes.applyHit; exteriorFoes.dfoHitTapped = true; exteriorFoes.applyHit = (from, data) => { const r = orig(from, data); try { const f = r === true && data && data.slain === undefined && data.fb !== 1 ? exteriorFoes.foes.find((x) => !x.puppet && x.seq === (data.i | 0)) ?? null : null; if (f) exteriorFoes.dfoHitFn?.(from, data, f); } catch (e) { void e; } return r; }; } exteriorFoes.dfoHitFn = typeof fn === 'function' ? fn : null; return true; },
++  npcSpells: (f) => (Array.isArray(f?.entity?.spells) ? f.entity.spells.map((s, i) => ({ i, index: s.index | 0, name: String(s.name ?? s.index), element: s.element ?? null, range: s.rangeType ?? null })) : []),
++  npcAim: (f, id) => { if (!f?.ai) return false; const c = typeof id === 'string' ? exteriorFoes.peerCandidate(id) : null; if (!c) return false; f.ai.target = c; f.ai.secondaryTarget = c; return true; },
++  npcCast: (f, i, id, look) => { if (!f || f.dead || f.puppet || !f.ai || !exteriorFoes.foes.includes(f) || !exteriorFoes.castSpellFrom) return false; const sp = f.entity?.spells?.[i | 0]; if (!sp) return false; let c = typeof id === 'string' ? exteriorFoes.peerCandidate(id) : null; let aimAt = null; if (look === true && sp.rangeType !== 0 && sp.rangeType !== 3) { const a = f.ai, cp = Math.cos(cam.pitch || 0), fw = [Math.sin(cam.yaw) * cp, Math.sin(cam.pitch || 0), Math.cos(cam.yaw) * cp]; const eye = [a.feet[0], a.feet[1] + (a.height ?? 1.8) * 0.75, a.feet[2]]; let best = null, bestAng = 0.2; for (const p of exteriorFoes.peerCandidates?.() ?? []) { if (!p || !(p.health > 0) || !Array.isArray(p.feet)) continue; const v = [p.feet[0] - eye[0], p.feet[1] + (p.height ?? 1.8) / 2 - eye[1], p.feet[2] - eye[2]]; const d = Math.hypot(v[0], v[1], v[2]); if (d < 0.5 || d > 80) continue; const ang = Math.acos(Math.max(-1, Math.min(1, (v[0] * fw[0] + v[1] * fw[1] + v[2] * fw[2]) / d))); if (ang < bestAng) { bestAng = ang; best = p; } } if (best) c = best; aimAt = best ? [best.feet[0], best.feet[1] + (best.height ?? 1.8) / 2, best.feet[2]] : [eye[0] + fw[0] * 40, eye[1] + fw[1] * 40, eye[2] + fw[2] * 40]; } if (c) { f.ai.target = c; f.ai.secondaryTarget = c; } const feet = enchantFeet(); return exteriorFoes.castSpellFrom(f, sp, feet, true, { aimAt: aimAt ?? exteriorFoes.castAimAt(f, feet) }) !== false; },
++  npcSwing: (f, id) => { if (!f || f.dead || f.puppet || !f.ai) return false; if (typeof id === 'string') { const c = exteriorFoes.peerCandidate(id); if (c) { f.ai.target = c; f.ai.secondaryTarget = c; } } f.ai._blowSwing = true; f.ai._blowAt = null; return true; },
++  npcPin: (f, id) => { if (!f?.ai) return false; const c = typeof id === 'string' ? exteriorFoes.peerCandidate(id) : null; f.ai.dfoPin = c; if (c) { f.ai.target = c; f.ai.secondaryTarget = c; if (f.ai.isHostile === false) f.ai.isHostile = true; } return !!c || id == null; },
++  npcHeal: (f) => { const e = f?.entity; if (!e || f.dead) return false; e.health = e.maxHealth ?? e.health; e.magicka = e.maxMagicka ?? e.magicka; return true; },
++  npcPace: (f, mult) => { const a = f?.ai; if (!a || !Number.isFinite(mult) || mult <= 0) return false; if (!Number.isFinite(a.dfoBaseSpeed)) a.dfoBaseSpeed = a.speed; a.speed = a.dfoBaseSpeed * mult; return true; },
++  usePotion: (it) => { if (!it || townTalk.overlayActive || !playerSpawned || !(playerEntity.health > 0) || !Array.isArray(playerEntity.items) || !playerEntity.items.includes(it)) return false; useMagicItem(it); return true; },
++  castOwn: (index) => { if (townTalk.overlayActive || !playerSpawned || !(playerEntity.health > 0)) return 'paused'; const sp = (playerEntity.spells ?? []).find((s) => s && s.index === index); if (!sp) return 'gone'; if (magic.castInProgress()) return 'busy'; if (magic.readiedIndex() !== index) { const took = magic.readySpell(sp); if (took === false) return 'refused'; } if (magic.readiedIndex() === index) return magic.interceptAttack(true, { cast: true }) === true ? 'fired' : 'armed'; return 'cast'; },
++  castState: () => ({ armed: !!magic.spellArmed(), busy: !!magic.castInProgress(), readied: magic.readiedIndex() }),
++  lootNear: (radius, minRank) => {
++    if (townTalk.overlayActive || !playerSpawned || !(playerEntity.health > 0)) return { taken: 0, refused: 0, why: 'paused' };
++    const me = enchantFeet(), reach = Number.isFinite(radius) ? radius : 6, rank = minRank | 0;
++    const say = (l) => townTalk.say(l), getQuest = (uid) => questBridge?.machine.getQuest(uid) ?? null;
++    let taken = 0, refused = 0;
++    const takeFrom = (items) => { if (!Array.isArray(items)) return; for (const it of [...items]) { if (!it || __dfoRarityRank(it) < rank) continue; const got = __dfoTakeOne(playerEntity, items, it, say, { getQuest, took: showPickups }); if (got && got.refused === true) refused++; else if (got) taken++; } };
++    const near = (t) => { const b = t?.aabb; if (!b) return false; const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2; return Math.hypot(cx - me[0], cz - me[2]) <= reach && Math.abs(b.min[1] - me[1]) <= 3; };
++    for (const t of droppedLoot.lootTargets()) { if (!near(t) || !String(t.key).startsWith('droppedLoot:')) continue; const pile = droppedLoot.pileFor(t.key); if (pile) takeFrom(pile.items); }
++    for (const pool of [exteriorFoes, cityGuards]) { if (!pool?.lootTargets || !pool.takeLoot) continue; for (const t of pool.lootTargets()) { if (!near(t)) continue; const uid = Number(String(t.key).split(':')[1]); const f = pool.foes?.find?.((x) => x.uid === uid); if (f?.puppet) continue; const before = taken; try { pool.takeLoot(t.key, say, (loot) => { takeFrom(loot?.items?.()); return taken > before; }); } catch (e) { void e; } } }
++    return { taken, refused };
++  },
++  npcPool: () => {
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return modes?.dungeonCtx?.foes ?? [];
++    if (mode === 'interior') return modes?.insideFoes?.() ?? [];
++    return [...exteriorFoes.foes, ...cityGuards.guards];
++  },
++  npcKill: (f) => {
++    if (!f || f.dead || f.puppet) return false;
++    const mode = modes?.mode ?? 'exterior', hp = (f.entity?.health ?? 0) + 1;
++    if (mode === 'dungeon') { modes?.dungeonCtx?.damageFoe?.(f, hp, enchantFeet(), null, { fromPlayer: true, bypassShield: true }); return true; }
++    if (mode === 'interior') return !!modes?.dfoKillInside?.(f);
++    if (!exteriorFoes.foes.includes(f)) return false;
++    exteriorFoes.damageFoe(f, hp, enchantFeet(), null, { fromPlayer: true, bypassShield: true });
++    return true;
++  },
++  npcDown: (f) => {
++    if (!f || f.dead || f.puppet) return false;
++    const mode = modes?.mode ?? 'exterior', hp = (f.entity?.health ?? 0) + 1, blow = { fromPlayer: true, bypassShield: true, whole: true };
++    if (mode === 'dungeon') { modes?.dungeonCtx?.damageFoe?.(f, hp, enchantFeet(), null, blow); return !!f.yielded; }
++    if (mode === 'interior') return !!modes?.dfoDownInside?.(f);
++    if (!exteriorFoes.foes.includes(f)) return false;
++    exteriorFoes.damageFoe(f, hp, enchantFeet(), null, blow);
++    return !!f.yielded;
++  },
++  npcRemove: (f) => {
++    if (!f || f.puppet) return false;
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return !!modes?.dungeonCtx?.removeLooseFoe?.(f);
++    if (mode === 'interior') return !!modes?.dfoRemoveInside?.(f);
++    if (!exteriorFoes.foes.includes(f)) return false;
++    exteriorFoes.removeFoe(f);
++    return true;
++  },
++  bodyOf: (key) => {
++    if (typeof key !== 'string') return null;
++    const mode = modes?.mode ?? 'exterior';
++    if (mode === 'dungeon') return key.startsWith('corpse:') ? modes?.dungeonCtx?.foes?.[Number(key.slice(7))] ?? null : null;
++    if (mode === 'interior') return modes?.dfoBodyOf?.(key) ?? null;
++    return key.startsWith('foeCorpse:') ? exteriorFoes.foes.find((f) => exteriorFoes.corpseKeyOf(f) === key) ?? null : null;
++  },
++  settlePile: (key) => { if (typeof key === 'string' && key.startsWith('loot:') && (modes?.mode ?? 'exterior') === 'dungeon') modes?.dungeonCtx?.__dfoSettlePile?.(Number(key.slice(5))); },
++  openList: (items, name) => {
++    if (townTalk.overlayActive && !townTalk.overlayDone) return false;
++    const hooks = { items: () => items, playerOwned: false, title: name, containerImage: () => CONTAINER_IMAGES.Chest, pos: [...enchantFeet()] };
++    const mode = modes?.mode ?? 'exterior';
++    if (mode !== 'exterior') return !!modes?.openLootList?.(items, hooks);
++    const w = makeInventoryWindow({ loot: hooks });
++    if (w) townTalk.showOverlay(w);
++    return !!w;
++  },
+   raiseSkillsNow: () => {
+     if (townTalk.overlayActive || !(playerEntity.health > 0)) return { why: 'busy' };
+     const was = playerEntity.lastSkillCheckTime;
+@@ -152,9 +341,13 @@ const WORLD_HOOK = `import('../devtools/overlay/tap.js').then((m) => m.tapWorld(
+ 
+ // world.js: the veiled slot's draw (drawVeiledPeerBodies, after the opaque world) calls tap.js drawHook too - the quest
+ // path's picture. Guarded: an overlay draw that throws never takes the frame with it. The import rides line 1
+-const WORLD_IMPORT = "import * as __dfoTapW from '../devtools/overlay/tap.js'; import { travellerWorldOf as __dfoTravWorld } from '../systems/travellerMarks.js';";
++const WORLD_IMPORT = "import * as __dfoTapW from '../devtools/overlay/tap.js'; import { travellerWorldOf as __dfoTravWorld } from '../systems/travellerMarks.js'; import { besideTargetOf as __dfoBesideOf } from '../systems/party/partyTravelLaw.js'; import { partyArrivalBeside as __dfoBeside } from '../systems/party/partyArrival.js'; import { takeOneItem as __dfoTakeOne } from '../systems/quickLoot.js'; import { rarityRank as __dfoRarityRank } from '../systems/loot/lootRarity.js'; import { loadEnemyCareer as __dfoCareer } from '../characters/enemy/enemyEntity.js';";
+ const WORLD_EDITS = [
++  ['my swing held while I drive a boss', "modeNow() === 'exterior') { if (gatherHost?.acting()) return;", "modeNow() === 'exterior') { if (__dfoTapW.possess.foe()?.dfoPossess === true) return; if (gatherHost?.acting()) return;"],
++  ['my activate held while I drive a boss', "const _activateDown = held(keys, 'ActivateCenterObject') || _tapArmed > 0;", "const _activateDown = __dfoTapW.possess.foe()?.dfoPossess !== true && (held(keys, 'ActivateCenterObject') || _tapArmed > 0);"],
+   ['the veiled draw', 'partyPing?.draw(renderer); };', 'partyPing?.draw(renderer); try { __dfoTapW.drawHook.fn?.(renderer); } catch { /* the overlay\'s */ } };'],
++  ['the concealed drawn open', "const look = pvpFlag.look(d.id, d.shown?.cv | 0, peerDraw(d.shown?.cv | 0, veilOn, _veilT, d.id));", "const __dfoCv = __dfoTapW.revealCv(d.shown?.cv | 0); const look = pvpFlag.look(d.id, __dfoCv, peerDraw(__dfoCv, veilOn, _veilT, d.id));"],
++  ['the concealed listed in Local', "if (tabId === 'local') return localRosterSource(s, openPeers(peersNear(), isPartyMate), player.feetAt());", "if (tabId === 'local') return localRosterSource(s, __dfoTapW.revealConcealed.local ? peersNear() : openPeers(peersNear(), isPartyMate), player.feetAt());"],
+ ];
+ 
+ // scenes/worldModes.js createWorldModes: the guild services' own doors, for the Services panel (staff tests) - each
+@@ -215,6 +408,25 @@ const MODES_HOOK = `import('../devtools/overlay/tap.js').then((m) => m.tapModes(
+     surfacePlayer();
+     return { why: 'ok', tally: r.tally, price };
+   },
++  dfoStandInside: (type, o, extra, place) => {
++    if (!interiorCtx || !interiorFoes) return null;
++    return standLooseFoe({
++      collider: interiorCtx.collider, feet: player.pos, yawRad: cam.yaw, fovDegrees: fieldOfView() * 180 / Math.PI, foes: interiorFoePool(),
++      spawn: (mt, pos, s) => interiorFoes.spawnFoe(mt, pos, { yaw: s.yawRad, allied: s.allied, loose: true, transient: true, grantKind: o?.grantKind ?? null, level: extra?.level ?? null, gender: extra?.gender ?? null, eliteFoe: extra?.eliteFoe }),
++    }, type, place ?? {});
++  },
++  dfoKillInside: (f) => {
++    if (!interiorFoes || !f || f.dead || f.puppet || !interiorFoes.foes.includes(f)) return false;
++    interiorFoes.damageFoe(f, (f.entity?.health ?? 0) + 1, player.pos, null, { fromPlayer: true, bypassShield: true });
++    return true;
++  },
++  dfoDownInside: (f) => {
++    if (!interiorFoes || !f || f.dead || f.puppet || !interiorFoes.foes.includes(f)) return false;
++    interiorFoes.damageFoe(f, (f.entity?.health ?? 0) + 1, player.pos, null, { fromPlayer: true, bypassShield: true, whole: true });
++    return !!f.yielded;
++  },
++  dfoRemoveInside: (f) => { if (!interiorFoes || !f || f.puppet || !interiorFoes.foes.includes(f)) return false; interiorFoes.removeFoe(f); return true; },
++  dfoBodyOf: (key) => (typeof key === 'string' && key.startsWith('foeCorpse:') ? interiorFoes?.foes?.find((f) => interiorFoes.corpseKeyOf(f) === key) ?? null : null),
+   questMarksIn: (where, followedId) => {
+     if (where === 'dungeon') return dungeonCtx ? dungeonQuestMarks({
+       stands: dungeonQuestFlats, foes: dungeonCtx.foes ?? [], boxOf: questStandBox, followedId,
+@@ -254,6 +466,88 @@ const SPELL_EDITS = [
+   ['the spell maker\'s bill', 'purchaseSpell(this.entity, spell, this.totalGoldCost);', 'purchaseSpell(this.entity, spell, __dfoTap.freeSpell.on ? 0 : this.totalGoldCost);'],
+ ];
+ 
++// net/firmament/firmamentBook.js canRespec / respec: the respec's local gold check and its local reserve, read through
++// tap.js freeFirm (the Firmament panel). The service's own respec is still what is asked, with no silver by the law
++const FIRM_IMPORT = "import * as __dfoTap from '../../devtools/overlay/tap.js';";
++const FIRM_EDITS = [
++  ['the respec\'s can-pay check', 'w.gold() >= FIRM_RESPEC_GOLD &&', '(__dfoTap.freeFirm.on || w.gold() >= FIRM_RESPEC_GOLD) &&'],
++  ['the respec\'s purse check', "if (!w || w.gold() < FIRM_RESPEC_GOLD) return { ok: false, error: 'firm-gold' };", "if (!w || (!__dfoTap.freeFirm.on && w.gold() < FIRM_RESPEC_GOLD)) return { ok: false, error: 'firm-gold' };"],
++  ['the respec\'s reserve', 'reserve: walletReserve(w, FIRM_RESPEC_GOLD).reserve,', 'reserve: __dfoTap.freeFirm.on ? null : walletReserve(w, FIRM_RESPEC_GOLD).reserve,'],
++];
++
++// systems/revenant/revenantArts.js drawArt: a revenant's art is drawn on its id - unless the Spawn panel chose one for
++// the record (kept on it as `art`, read through tap.js revenantArt.lookup); every reader of the art goes through drawArt
++const ARTS_EDITS = [
++  ['the chosen art', "  const rolls = idStream(id, 'art');", "  const dfoArt = __dfoTap.revenantArt.lookup?.(id); if (dfoArt) return dfoArt; const rolls = idStream(id, 'art');"],
++];
++// systems/revenant/revenant.js revenantHeld: the revenants' Renown hold, read through tap.js noRevenantHold (the Spawn
++// panel's revenant stand - a test character under Renown 10 online may make one and spare it)
++const REVENANT_IMPORT = "import * as __dfoTap from '../../devtools/overlay/tap.js';";
++const REVENANT_EDITS = [
++  ['a chosen art kept', '    trait: isStr(r.trait) && r.trait ? r.trait : null, elite: !!r.elite,', '    trait: isStr(r.trait) && r.trait ? r.trait : null, elite: !!r.elite, art: isStr(r.art) && r.art ? r.art : null,'],
++  ['the record touched and written', 'const touch = (r) => { r.rev = (r.rev | 0) + 1; };', 'const touch = (r) => { r.rev = (r.rev | 0) + 1; }; export const dfoTouch = (r) => { touch(r); persist(); }; export const dfoBury = (r) => { const b = _bodies.get(r.id); if (b) _left.add(b); _bodies.delete(r.id); _claims.delete(r.id); bury(r); persist(); };'],
++  ['the revenants\' Renown hold', 'export const revenantHeld = (o) => !renownOpens(REVENANT_MIN_RENOWN, o);', 'export const revenantHeld = (o) => !__dfoTap.noRevenantHold.on && !renownOpens(REVENANT_MIN_RENOWN, o);'],
++];
++
++// SHOWTIME (panels/showtime.js): scenes/auraHost.js wears the aura the overlay names at my own feet (tap.js showtime.aura)
++// in the token's place; characters/enemy/enemyTargets.js runTargetMachine puts a pinned quarry (ai.dfoPin) back after
++// every re-pick while it lives; the pools hand out their peer candidates (exteriorFoes.js here, the dungeon's above)
++const SHOW_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const SHOW_EDITS = [
++  ['the aura host\'s own', 'const mine = ownAura(), kit = ownArmory(), fx = ownEffects();', 'const mine = ownAura(), kit = ownArmory(), fx = ownEffects(), __dfoAura = __dfoTap.showtime.aura || mine;'],
++  ['the aura host\'s wear', 'if (mine && spawned) {', 'if (__dfoAura && spawned) {'],
++  ['the aura host\'s kindle', 'if (self.aura !== mine) self.since = t;', 'if (self.aura !== __dfoAura) self.since = t;'],
++  ['the aura host\'s look', 'self.aura = mine;', 'self.aura = __dfoAura;'],
++  ['the aura host\'s offline gate', 'if (!online || deps.travelActive()) return;', 'if ((!online && !__dfoTap.showtime.aura) || deps.travelActive()) return;'],
++  ['the aura host\'s rehello', 'if (online.rehello?.()) {', 'if (online?.rehello?.()) {'],
++  ['the aura host\'s guild tag', 'online.guildTagOf?.(d.id)', 'online?.guildTagOf?.(d.id)'],
++];
++const PILOT_EDITS = [
++  ['the pilot\'s foe', 'f.raidKey === _p.key && !!f.entity?.staffBoss', '((f.raidKey === _p.key && !!f.entity?.staffBoss) || f.dfoPossess === true)'],
++  ['the free hand', "if (kind === 'cast') return now - _p.castAt > PILOT_CAST_MS;", "if (f.dfoFree === true) return false; if (kind === 'cast') return now - _p.castAt > PILOT_CAST_MS;"],
++  ['the feet a typed array', '  if (!pilotFoe(f) || !_p || !Array.isArray(feet)) return null;', '  if (!pilotFoe(f) || !_p || !(Array.isArray(feet) || ArrayBuffer.isView(feet))) return null;'],
++];
++// combat/weapon/weaponRig.js: my hands are not drawn while the Boss panel's camera stands behind the boss I drive (tap.js
++// bossEye.fn) - the Morrowind arm and the classic sprite lane both: nothing of me on the screen, the boss alone
++const WEAPON_RIG_IMPORT = "import * as __dfoTap from '../../devtools/overlay/tap.js';";
++const WEAPON_RIG_EDITS = [
++  ['the sprite hands hidden', '      if (c && !eotbHidesWeapon() && !fpArm.active() && !sheetWindowUp() && (runDrawn || (pairUp() && shown()))) {', '      if (c && !eotbHidesWeapon() && !__dfoTap.bossEye.fn && !fpArm.active() && !sheetWindowUp() && (runDrawn || (pairUp() && shown()))) {'],
++  ['the arm hidden', '      if (fpArm.active()) { fpArm.draw(c); return; }', '      if (fpArm.active()) { if (!__dfoTap.bossEye.fn) fpArm.draw(c); return; }'],
++];
++// ui/enhanced/enhancedHotbar.js onKey: the slots' keys are the boss's while I drive one (the Boss panel's bar stands in the
++// hotbar's place, keys 1-9 its spells - tap.js possess.foe, a foe with dfoPossess)
++const HOTBAR_IMPORT = "import * as __dfoTap from '../../devtools/overlay/tap.js';";
++const HOTBAR_EDITS = [
++  ['the slots held while I drive a boss', '  if (!bar || !hotbarMode()) return;', '  if (!bar || !hotbarMode() || __dfoTap.possess.foe()?.dfoPossess === true) return;'],
++];
++// player/mwView.js mwViewDrawBody: my own body (the sprite lane draws it behind the eye in first person) is not drawn
++// while the Boss panel's camera stands behind the boss I drive (tap.js bossEye.fn)
++const MWVIEW_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const MWVIEW_EDITS = [
++  ['my body unseen while the boss camera stands', '  if (onDragon && mwViewThirdPerson()) {', '  if (__dfoTap.bossEye.fn) return false; if (onDragon && mwViewThirdPerson()) {'],
++];
++const PILOT_HOST_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const PILOT_HOST_EDITS = [
++  ['the pilot host\'s boss', '      const boss = bossOf();', '      const boss = bossOf() ?? __dfoTap.possess.foe();'],
++  ['the boss eye', '      pilotYaw(cam.yaw);', '      pilotYaw(cam.yaw); __dfoTap.bossEye.fn?.(cam);'],
++];
++const TARGET_EDITS = [
++  ['the pinned quarry', 'ai.target = got.target;', 'ai.target = got.target; if (ai.dfoPin) { if (targetHealth(ai.dfoPin, playerEntity) > 0) ai.target = ai.dfoPin; else ai.dfoPin = null; }'],
++];
++// (and the boss I drive DRAWN while the Boss panel's camera stands behind it - the game skips it, its own camera inside)
++const FOES_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const FOES_EDITS = [
++  ['the driven boss drawn', '      if (pilotFoe(f)) continue;', '      if (pilotFoe(f) && !__dfoTap.bossEye.fn) continue;'],
++  ['the street pool\'s peer candidates', 'return { foes, spawnFoe, damageFoe, encounterRoom,', 'return { peerCandidate, peerCandidates, castSpellFrom, castAimAt, foes, spawnFoe, damageFoe, encounterRoom,'],
++];
++
++// systems/steedCare.js horseBornStats: a steed's born stats are its seed's - unless the Mounts panel chose them (tap.js
++// steedBorn.of); every reader (the stats as they stand, the saddle, the yard's price) goes through horseBornStats
++const STEED_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const STEED_EDITS = [
++  ['the chosen born stats', 'export const horseBornStats = (item) => bornStats(seedOf(item));', 'export const horseBornStats = (item) => __dfoTap.steedBorn.of?.(item) ?? bornStats(seedOf(item));'],
++];
++
+ // systems/advancement.js raiseSkills: its 6-hour wait, read through tap.js noSkillWait
+ const SKILL_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
+ const SKILL_EDITS = [
+@@ -361,6 +655,89 @@ const QL_EDITS = [
+   ['the take-all', '  if (isJunk(item)) return true;', '  if (isJunk(item) || __dfoLoot.leaves(item, __dfoLootReads)) return true;'],
+ ];
+ const QL_FOOT = "const __dfoLootReads = { material: __dfoMat, rank: rarityRank, ammo: isAmmunition, name: (it) => __dfoName(it).name };";
++// scenes/hostCombat.js spawnEnemyLoot's tail: the drop rule's door (dropRule.js, tap.js dropHook) - called with every foe
++// this client rolled loot for, after its cap, so the rule's pieces are laid last and the cap it lifts is already read
++const DROP_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++// characters/enemy/enemyEntity.js: the last of the three edits a row takes at the mint, exported so the Spawn panel's guide
++// reads a kind's numbers as the mint will (a mod's Start-time edit is not reachable otherwise)
++const MINT_EDITS = [
++  ['the mint row edit', 'const editAtMint = (mobileType, row) => {', 'export const editAtMint = (mobileType, row) => {'],
++];
++const DROP_EDITS = [
++  ['the drop rule', '  capFoeLoot(entity);', "  capFoeLoot(entity); try { __dfoTap.dropHook.fn?.(entity, mobileType, basics, where); } catch (e) { console.warn('[overlay] drop rule', e); }"],
++];
++// ui/worldPlaque.js worldHoverFrame: the frame the plaque resolved and the host's contents reader, kept for the Loot
++// editor (tap.js hover) - what the plaque names under the crosshair is what the editor edits
++const PLAQUE_IMPORT = "import * as __dfoTapP from '../devtools/overlay/tap.js';";
++const PLAQUE_EDITS = [
++  ['the crosshair frame', 'const frame = markBodyStack(resolveHover(hit, { name, contents }));', 'const frame = markBodyStack(resolveHover(hit, { name, contents })); __dfoTapP.hover.set(frame, contents);'],
++];
++// scenes/dungeonContext.js: a pile's flat settled after the Loot editor changed its list (settleLootFlat is the
++// context's own; the window's close calls it) - laid beside lootContents on the context's API
++const DUNGEON_EDITS = [
++  ['the pile settle', '    lootContents(key) {', '    __dfoSettlePile(i) { settleLootFlat(i); }, lootContents(key) {'],
++  ['the dungeon pool\'s peer candidates', '    spawnLooseFoe,   // SD1', '    peerCandidate, spawnLooseFoe,   // SD1'],
++];
++// systems/reforge.js: the Mages Guild Reforge's purse (court.js's totalGoldAmount/deductGold, its own shardsHeld/spendShards)
++// read through tap.js freeReforge - on, gold and shards are held without limit and never taken, for every arm the window
++// has (the reforge, the hone, the gems, the salvage's partner the imprint). The pieces' law is untouched. The import
++// rides line 1, so no line moves; the court pair is re-bound under the names the file already uses.
++const REFORGE_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const REFORGE_EDITS = [
++  ['the Reforge\'s purse', "import { totalGoldAmount, deductGold } from './court.js';",
++    "import { totalGoldAmount as __dfoGoldOf, deductGold as __dfoDeductGold } from './court.js'; const totalGoldAmount = (p) => (__dfoTap.freeReforge.on ? Infinity : __dfoGoldOf(p)); const deductGold = (p, n) => (__dfoTap.freeReforge.on ? 0 : __dfoDeductGold(p, n));"],
++  ['the Reforge\'s shards held', 'export const shardsHeld = (items) =>', 'export const shardsHeld = (items) => __dfoTap.freeReforge.on ? Infinity :'],
++  ['the Reforge\'s shards spent', 'export function spendShards(items, n) {', 'export function spendShards(items, n) { if (__dfoTap.freeReforge.on) return true;'],
++];
++// systems/loot/lootCodex.js: the imprint's purse, the same pair re-bound (its shards go through reforge.js, above)
++const CODEX_IMPORT = "import * as __dfoTap from '../../devtools/overlay/tap.js';";
++const CODEX_EDITS = [
++  ['the imprint\'s purse', "import { totalGoldAmount, deductGold } from '../court.js';",
++    "import { totalGoldAmount as __dfoGoldOf, deductGold as __dfoDeductGold } from '../court.js'; const totalGoldAmount = (p) => (__dfoTap.freeReforge.on ? Infinity : __dfoGoldOf(p)); const deductGold = (p, n) => (__dfoTap.freeReforge.on ? 0 : __dfoDeductGold(p, n));"],
++];
++// ui/spellbookWindow.js's Buy (buySpell / confirmTrade): its purse check and its bill, read through tap.js freeBuySpell
++const SPELLBOOK_IMPORT = "import * as __dfoTapB from '../devtools/overlay/tap.js';";
++const SPELLBOOK_EDITS = [
++  ['the spellbook\'s purse', "    if (totalGoldAmount(entity) < price) { this.top = 'notEnoughGold'; return; }", "    if (!__dfoTapB.freeBuySpell.on && totalGoldAmount(entity) < price) { this.top = 'notEnoughGold'; return; }"],
++  ['the spellbook\'s bill', '        purchaseSpell(this.deps.entity, { ...spell }, this.tradePrice());', '        purchaseSpell(this.deps.entity, { ...spell }, __dfoTapB.freeBuySpell.on ? 0 : this.tradePrice());'],
++];
++// scenes/worldModes.js's counters, read through tap.js freeCounter (the __dfoTap import is SUMMON_IMPORT's): the trade
++// window's purse reads bottomless and its concluded deal is priced at nothing unless it is a sale; a keyed shelf's row
++// is priced at nothing (buyPrice, which its purse check, its bill and its row's label all read). Every anchor here is
++// ONE LINE: the working tree may be CRLF, so an anchor must never span a line end
++const COUNTER_EDITS = [
++  ['the counter\'s purse', '      gold: () => totalGoldAmount(playerEntity),', '      gold: () => (__dfoTap.freeCounter.on ? Infinity : totalGoldAmount(playerEntity)),'],
++  ['the counter\'s deal', 'function commitTrade(shelf, mode, staged, price, proceeds, identifySpell = null, asked = {}) {', "function commitTrade(shelf, mode, staged, price, proceeds, identifySpell = null, asked = {}) { if (__dfoTap.freeCounter.on && mode !== 'Sell') price = 0;"],
++  ['the keyed price', '  function buyPrice(it) {', '  function buyPrice(it) { if (__dfoTap.freeCounter.on) return 0;'],
++];
++
++// NO CARRY LIMIT (tap.js noCarryLimit): combat/formulas.js entityMaxEncumbrance - DaggerfallEntity.MaxEncumbrance, the ONE
++// ceiling every reader asks (the pack's take through itemTransfer's canHoldAmount, the shelf's buy, the bank's gold draw,
++// the materials bag, the forage, the character sheets' and the inventory's readouts) - answers Infinity while the switch
++// is on. Every reader's arithmetic stands under it: canHoldAmount's Math.min keeps the stack, the sheets' ratios read 0,
++// comeSailAway's isFinite guard says never too heavy, Roleplay Realism's encumbrance effect reads 0 over the cap and
++// answers null. The readouts print "Infinity". The anchor is ONE LINE (the tree may be CRLF).
++const CARRY_IMPORT = "import * as __dfoTap from '../devtools/overlay/tap.js';";
++const CARRY_EDITS = [
++  ['the carry ceiling', 'export const entityMaxEncumbrance = (entity) => {', 'export const entityMaxEncumbrance = (entity) => { if (__dfoTap.noCarryLimit.on) return Infinity;'],
++];
++
++// FREE POTIONS (tap.js freePotion, read through devtools/overlay/potionHook.js): the potion maker's host (its recipe
++// list every recipe the game knows; MakePotionService's empty-handed refusal passed) and its window (a recipe the pack
++// cannot fill filled with phantom units of its own templates, so DFU's hash names it; the station's brew not asked; the
++// mix's spend walk skipped, the pot emptied). The potion is the host's own addPotion. Every anchor is ONE LINE.
++const POTION_HOST_IMPORT = "import * as __dfoPotion from '../devtools/overlay/potionHook.js';";
++const POTION_HOST_EDITS = [
++  ['the maker\'s recipe list', '    recipeKeys: () => {', '    recipeKeys: () => { if (__dfoPotion.freeOn()) return __dfoPotion.allRecipeKeys();'],
++  ['the maker\'s empty-handed refusal', '    stocked: () => carried().some(isIngredient) || storeItems().length > 0,', '    stocked: () => __dfoPotion.freeOn() || carried().some(isIngredient) || storeItems().length > 0,'],
++];
++const POTION_WINDOW_IMPORT = "import * as __dfoPotion from '../devtools/overlay/potionHook.js';";
++const POTION_WINDOW_EDITS = [
++  ['the cauldron\'s fill', '    if (missing.length > 0) {', '    if (missing.length > 0 && __dfoPotion.freeOn()) { this.cauldron = __dfoPotion.phantomCauldron(recipe); this.nameLabel = recipe.displayName; return; } if (missing.length > 0) {'],
++  ['the mix\'s door', '    const door = this.hooks.brew?.(result, this.cauldron) ?? null;', '    const door = __dfoPotion.freeOn() ? null : (this.hooks.brew?.(result, this.cauldron) ?? null);'],
++  ['the mix\'s spend', '    const spend = consumeCauldron(this.cauldron, {', "    const spend = __dfoPotion.freeOn() ? { kind: 'spent' } : consumeCauldron(this.cauldron, {"],
++];
++
+ const editAll = (ctx, code, edits, file) => {
+   let out = code;
+   for (const [what, from, to] of edits) {
+@@ -391,11 +768,17 @@ function overlayHooks() {
+         if (!m) this.error('[dfo-overlay] createWorldModes\'s opening line is gone from src/scenes/worldModes.js - the modes hook needs a new anchor');
+         const at = m.index + m[0].length;
+         const hooked = `${code.slice(0, at)} ${MODES_HOOK} ${code.slice(at)}`;
+-        return { code: `${SUMMON_IMPORT} ${TRAIN_NOW_IMPORT} ${editAll(this, hooked, [...SUMMON_EDITS, ...TRAIN_FEE_EDITS], 'src/scenes/worldModes.js')}`, map: null };
++        return { code: `${SUMMON_IMPORT} ${TRAIN_NOW_IMPORT} ${editAll(this, hooked, [...SUMMON_EDITS, ...TRAIN_FEE_EDITS, ...COUNTER_EDITS], 'src/scenes/worldModes.js')}`, map: null };
+       }
+       if (fileIs(id, '/src/ui/item/itemMakerWindow.js')) {
+         return { code: `${MAKER_IMPORT} ${editAll(this, code, MAKER_EDITS, 'src/ui/item/itemMakerWindow.js')}`, map: null };
+       }
++      if (fileIs(id, '/src/characters/enemy/enemyEntity.js')) {
++        return { code: editAll(this, code, MINT_EDITS, 'src/characters/enemy/enemyEntity.js'), map: null };
++      }
++      if (fileIs(id, '/src/systems/steedCare.js')) {
++        return { code: `${STEED_IMPORT} ${editAll(this, code, STEED_EDITS, 'src/systems/steedCare.js')}`, map: null };
++      }
+       if (fileIs(id, '/src/systems/advancement.js')) {
+         return { code: `${SKILL_IMPORT} ${editAll(this, code, SKILL_EDITS, 'src/systems/advancement.js')}`, map: null };
+       }
+@@ -405,6 +788,39 @@ function overlayHooks() {
+       if (fileIs(id, '/src/ui/guildServiceWindows.js')) {
+         return { code: `${TRAIN_WINDOW_IMPORT} ${editAll(this, code, TRAIN_WINDOW_EDITS, 'src/ui/guildServiceWindows.js')}`, map: null };
+       }
++      if (fileIs(id, '/src/scenes/auraHost.js')) {
++        return { code: `${SHOW_IMPORT} ${editAll(this, code, SHOW_EDITS, 'src/scenes/auraHost.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/ui/enhanced/enhancedHotbar.js')) {
++        return { code: `${HOTBAR_IMPORT} ${editAll(this, code, HOTBAR_EDITS, 'src/ui/enhanced/enhancedHotbar.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/player/mwView.js')) {
++        return { code: `${MWVIEW_IMPORT} ${editAll(this, code, MWVIEW_EDITS, 'src/player/mwView.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/combat/weapon/weaponRig.js')) {
++        return { code: `${WEAPON_RIG_IMPORT} ${editAll(this, code, WEAPON_RIG_EDITS, 'src/combat/weapon/weaponRig.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/systems/staffBossPilot.js')) {
++        return { code: editAll(this, code, PILOT_EDITS, 'src/systems/staffBossPilot.js'), map: null };
++      }
++      if (fileIs(id, '/src/scenes/staffPilotHost.js')) {
++        return { code: `${PILOT_HOST_IMPORT} ${editAll(this, code, PILOT_HOST_EDITS, 'src/scenes/staffPilotHost.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/characters/enemy/enemyTargets.js')) {
++        return { code: editAll(this, code, TARGET_EDITS, 'src/characters/enemy/enemyTargets.js'), map: null };
++      }
++      if (fileIs(id, '/src/scenes/exteriorFoes.js')) {
++        return { code: `${FOES_IMPORT} ${editAll(this, code, FOES_EDITS, 'src/scenes/exteriorFoes.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/systems/revenant/revenantArts.js')) {
++        return { code: `${REVENANT_IMPORT} ${editAll(this, code, ARTS_EDITS, 'src/systems/revenant/revenantArts.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/systems/revenant/revenant.js')) {
++        return { code: `${REVENANT_IMPORT} ${editAll(this, code, REVENANT_EDITS, 'src/systems/revenant/revenant.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/net/firmament/firmamentBook.js')) {
++        return { code: `${FIRM_IMPORT} ${editAll(this, code, FIRM_EDITS, 'src/net/firmament/firmamentBook.js')}`, map: null };
++      }
+       if (fileIs(id, '/src/ui/spell/spellMakerWindow.js')) {
+         return { code: `${SPELL_IMPORT} ${editAll(this, code, SPELL_EDITS, 'src/ui/spell/spellMakerWindow.js')}`, map: null };
+       }
+@@ -423,6 +839,33 @@ function overlayHooks() {
+         if (!/import \{[^}]*\blocalListAccepts\b[^}]*\}/.test(code)) this.error('[dfo-overlay] the Sell helper\'s door needs localListAccepts imported in src/ui/enhanced/enhancedTrade.js');
+         return { code: `${code}\n${TRADE_FOOT}\n`, map: null };
+       }
++      if (fileIs(id, '/src/systems/reforge.js')) {
++        return { code: `${REFORGE_IMPORT} ${editAll(this, code, REFORGE_EDITS, 'src/systems/reforge.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/systems/loot/lootCodex.js')) {
++        return { code: `${CODEX_IMPORT} ${editAll(this, code, CODEX_EDITS, 'src/systems/loot/lootCodex.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/ui/spellbookWindow.js')) {
++        return { code: `${SPELLBOOK_IMPORT} ${editAll(this, code, SPELLBOOK_EDITS, 'src/ui/spellbookWindow.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/scenes/potionMakerHost.js')) {
++        return { code: `${POTION_HOST_IMPORT} ${editAll(this, code, POTION_HOST_EDITS, 'src/scenes/potionMakerHost.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/ui/potionMakerWindow.js')) {
++        return { code: `${POTION_WINDOW_IMPORT} ${editAll(this, code, POTION_WINDOW_EDITS, 'src/ui/potionMakerWindow.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/combat/formulas.js')) {
++        return { code: `${CARRY_IMPORT} ${editAll(this, code, CARRY_EDITS, 'src/combat/formulas.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/scenes/hostCombat.js')) {
++        return { code: `${DROP_IMPORT} ${editAll(this, code, DROP_EDITS, 'src/scenes/hostCombat.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/ui/worldPlaque.js')) {
++        return { code: `${PLAQUE_IMPORT} ${editAll(this, code, PLAQUE_EDITS, 'src/ui/worldPlaque.js')}`, map: null };
++      }
++      if (fileIs(id, '/src/scenes/dungeonContext.js')) {
++        return { code: editAll(this, code, DUNGEON_EDITS, 'src/scenes/dungeonContext.js'), map: null };
++      }
+       if (fileIs(id, '/src/systems/worldHover.js')) {
+         return { code: `${HOVER_IMPORT} ${editAll(this, code, HOVER_EDITS, 'src/systems/worldHover.js')}\n${HOVER_FOOT}\n`, map: null };
+       }
+warning: in the working copy of 'src/buildTag.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/devtools/overlay/index.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/devtools/overlay/panels/players.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/devtools/overlay/panels/services.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/devtools/overlay/vite.overlay.config.js', LF will be replaced by CRLF the next time Git touches it
+[2026-11-09T01:22:49.767Z] Building the game with the overlay (about a minute)...
